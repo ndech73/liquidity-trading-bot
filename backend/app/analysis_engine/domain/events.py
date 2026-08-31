@@ -1,12 +1,51 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any
+from datetime import datetime, timezone
+
+from app.analysis_engine.domain.candle import Timeframe
+from app.analysis_engine.domain.liquidity import LiquiditySide, LiquidityType
 
 
-@dataclass(frozen=True)
-class AnalysisEvent:
-    event_type: str
+@dataclass(frozen=True, slots=True)
+class DomainEvent:
+    """Base class every event shares: what symbol/timeframe it applies to,
+    and exactly when it happened."""
+
     symbol: str
-    timeframe: str
-    timestamp: datetime
-    data: dict[str, Any]
+    timeframe: Timeframe
+    occurred_at: datetime
+
+    def __post_init__(self) -> None:
+        if not self.symbol:
+            raise ValueError(f"{type(self).__name__} symbol cannot be empty")
+
+        object.__setattr__(self, "symbol", self.symbol.upper())
+        object.__setattr__(self, "timeframe", Timeframe(self.timeframe))
+
+        if self.occurred_at.tzinfo is None:
+            object.__setattr__(
+                self, "occurred_at", self.occurred_at.replace(tzinfo=timezone.utc)
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class LiquiditySweepEvent(DomainEvent):
+    """Fired when a LiquidityZone gets swept — price ran through a resting
+    stop cluster."""
+
+    zone_id: str
+    side: LiquiditySide
+    liquidity_type: LiquidityType
+    level_price: float
+    sweep_price: float
+
+    def __post_init__(self) -> None:
+        DomainEvent.__post_init__(self)
+
+        if not self.zone_id:
+            raise ValueError("LiquiditySweepEvent zone_id cannot be empty")
+        if self.level_price <= 0:
+            raise ValueError("LiquiditySweepEvent level_price must be positive")
+        if self.sweep_price <= 0:
+            raise ValueError("LiquiditySweepEvent sweep_price must be positive")
