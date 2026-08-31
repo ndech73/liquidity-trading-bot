@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# Environment/secrets
+.env
+
+# Data generated locally
+data/raw/*
+data/processed/*
+data/backtests/*
+
+# IDE
+.vscode/
+.idea/

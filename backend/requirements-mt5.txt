@@ -1,0 +1,4 @@
+# Install this only in the MT5 execution environment.
+# MetaTrader5's official Python integration is documented for a Python
+# process communicating with the running MT5 terminal.
+MetaTrader5>=5.0.0
