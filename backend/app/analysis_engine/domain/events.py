@@ -2,9 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import Enum
 
 from app.analysis_engine.domain.candle import Timeframe
 from app.analysis_engine.domain.liquidity import LiquiditySide, LiquidityType
+
+
+class SweepDetectionSource(str, Enum):
+    """Which pipeline caught the sweep. TICK means it was flagged the
+    instant price crossed the level, before any candle closed — CANDLE
+    means it was found by scanning closed OHLCV bars."""
+
+    CANDLE = "candle"
+    TICK = "tick"
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +49,7 @@ class LiquiditySweepEvent(DomainEvent):
     liquidity_type: LiquidityType
     level_price: float
     sweep_price: float
+    detected_via: SweepDetectionSource = SweepDetectionSource.CANDLE
 
     def __post_init__(self) -> None:
         DomainEvent.__post_init__(self)
@@ -49,3 +60,7 @@ class LiquiditySweepEvent(DomainEvent):
             raise ValueError("LiquiditySweepEvent level_price must be positive")
         if self.sweep_price <= 0:
             raise ValueError("LiquiditySweepEvent sweep_price must be positive")
+
+        object.__setattr__(
+            self, "detected_via", SweepDetectionSource(self.detected_via)
+        )

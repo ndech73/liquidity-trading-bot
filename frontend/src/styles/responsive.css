@@ -1,0 +1,21 @@
+/* Responsive Breakpoints & Utilities */
+@media (max-width: 1024px) {
+  .responsive-grid-trading {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .hide-on-mobile {
+    display: none !important;
+  }
+  .show-on-mobile {
+    display: block !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .show-on-mobile {
+    display: none !important;
+  }
+}

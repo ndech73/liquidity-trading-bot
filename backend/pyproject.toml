@@ -28,6 +28,9 @@ test = [
 mt5 = [
   "MetaTrader5>=5.0.0",
 ]
+mt5linux = [
+  "mt5linux>=1.1.1",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

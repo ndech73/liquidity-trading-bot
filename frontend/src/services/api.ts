@@ -1,6 +1,6 @@
-import axios from 'axios'
+import { apiClient } from '../shared/services/apiClient';
 
-export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  timeout: 10_000,
-})
+// Unified API Client: provides backward compatibility for legacy imports while using the shared client
+export const api = apiClient;
+export { apiClient };
+export default apiClient;
