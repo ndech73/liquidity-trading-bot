@@ -1,18 +1,20 @@
 import React from 'react';
-import { PanelLeftClose, PanelLeftOpen, Activity, Wallet } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, Activity, Wallet, Radio } from 'lucide-react';
 
 export interface TopbarProps {
   botStatus?: 'RUNNING' | 'PAUSED' | 'OFFLINE';
   accountBalance?: number;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
+  isWsConnected?: boolean;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
-  botStatus = 'RUNNING',
-  accountBalance = 10450.75,
+  botStatus = 'OFFLINE',
+  accountBalance = 0,
   isSidebarCollapsed = false,
   onToggleSidebar,
+  isWsConnected = false,
 }) => {
   return (
     <header className="h-16 bg-slate-900 border-b border-slate-800 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20">
@@ -42,6 +44,19 @@ export const Topbar: React.FC<TopbarProps> = ({
           />
           <span className="font-medium text-slate-300">{botStatus}</span>
         </div>
+        <div
+          className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800/80 border border-slate-700/50 rounded-full text-xs"
+          title={isWsConnected ? 'WebSocket Relay Connected' : 'WebSocket Reconnecting...'}
+        >
+          <Radio
+            className={`w-3.5 h-3.5 ${
+              isWsConnected ? 'text-emerald-400 animate-pulse' : 'text-rose-400'
+            }`}
+          />
+          <span className="font-medium text-slate-300 hidden md:inline">
+            {isWsConnected ? 'RELAY LIVE' : 'WS RECONNECTING'}
+          </span>
+        </div>
       </div>
 
       <div className="flex items-center gap-4 sm:gap-6 text-sm">
@@ -61,3 +76,4 @@ export const Topbar: React.FC<TopbarProps> = ({
     </header>
   );
 };
+

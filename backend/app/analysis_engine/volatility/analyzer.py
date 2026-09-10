@@ -46,6 +46,14 @@ class VolatilityAnalyzer:
     this keeps it self-calibrating per instrument/timeframe).
     """
 
+    # Floating-point tolerance for threshold comparisons. z_score is
+    # derived from a subtraction/division chain (current - mean) / stdev,
+    # so a z_score that is mathematically exactly equal to a threshold
+    # (e.g. 1.0) can land a few ULPs below it (e.g. 0.9999999999999998)
+    # purely from rounding. Without this epsilon, values sitting right on
+    # a boundary get silently classified one regime lower than intended.
+    _EPSILON = 1e-9
+
     def __init__(
         self,
         atr_period: int = 14,
@@ -142,11 +150,14 @@ class VolatilityAnalyzer:
 
         z_score = (current - baseline_mean) / baseline_stdev
 
-        if z_score >= self.extreme_threshold_stdev:
+        # Epsilon-tolerant comparisons: a z_score that should mathematically
+        # equal a threshold can land a hair below it due to float rounding
+        # in the mean/stdev/division chain above.
+        if z_score >= self.extreme_threshold_stdev - self._EPSILON:
             return VolatilityRegime.EXTREME
-        if z_score >= self.high_threshold_stdev:
+        if z_score >= self.high_threshold_stdev - self._EPSILON:
             return VolatilityRegime.HIGH
-        if z_score <= self.low_threshold_stdev:
+        if z_score <= self.low_threshold_stdev + self._EPSILON:
             return VolatilityRegime.LOW
         return VolatilityRegime.NORMAL
 

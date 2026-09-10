@@ -1,14 +1,23 @@
-import { LiquidityZone, SweepEvent } from '../types/analysis.types';
+import { apiClient } from '../../../shared/services/apiClient';
+import { LiquidityZone, SweepEvent, AnalysisStatusData } from '../types/analysis.types';
 
-export const getLiquidityZones = async (_symbol: string): Promise<LiquidityZone[]> => {
-  return [
-    { id: 'lz-1', priceHigh: 1.0890, priceLow: 1.0880, type: 'BUY_SIDE', strength: 0.85, isSwept: false },
-    { id: 'lz-2', priceHigh: 1.0815, priceLow: 1.0805, type: 'SELL_SIDE', strength: 0.92, isSwept: true },
-  ];
+export const getLiquidityZones = async (symbol: string): Promise<LiquidityZone[]> => {
+  const res = await apiClient.get<LiquidityZone[]>('/analysis/zones', { params: { symbol } });
+  return res.data;
 };
 
 export const getSweepEvents = async (symbol: string): Promise<SweepEvent[]> => {
-  return [
-    { id: 'se-1', symbol, timestamp: '2026-09-07 05:45:00', price: 1.0804, sweepType: 'LOW_SWEEP', reactionMagnitudePips: 24.5 },
-  ];
+  const res = await apiClient.get<SweepEvent[]>('/analysis/sweeps', { params: { symbol } });
+  return res.data;
 };
+
+export const getAnalysisOverview = async () => {
+  const res = await apiClient.get<{ total_zones: number; active_zones: number; swept_zones: number; total_sweeps: number }>('/analysis/overview');
+  return res.data;
+};
+
+export const getAnalysisStatus = async (symbol: string): Promise<AnalysisStatusData> => {
+  const res = await apiClient.get<AnalysisStatusData>('/analysis/status', { params: { symbol } });
+  return res.data;
+};
+

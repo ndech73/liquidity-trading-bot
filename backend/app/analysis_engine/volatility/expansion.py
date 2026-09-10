@@ -20,6 +20,7 @@ from typing import List, Sequence
 
 from app.analysis_engine.domain.candle import Candle
 from app.analysis_engine.volatility.analyzer import VolatilityAnalyzer
+from app.core.settings import get_settings
 
 
 class ExpansionDirection(str, Enum):
@@ -57,15 +58,31 @@ class ExpansionDetector:
         must be at least this fraction of the recent window's total
         range to count as a clear direction, rather than NEUTRAL
         (choppy back-and-forth that nets out near zero).
+
+    recent_window and baseline_window default to core/settings.py's
+    AnalysisEngineSettings when left as None. expansion_threshold and
+    direction_threshold have no corresponding settings yet, so they
+    keep their literal defaults — pass them explicitly if you want
+    those configurable too.
     """
 
     def __init__(
         self,
-        recent_window: int = 5,
-        baseline_window: int = 20,
+        recent_window: int | None = None,
+        baseline_window: int | None = None,
         expansion_threshold: float = 1.5,
         direction_threshold: float = 0.3,
     ) -> None:
+        settings = get_settings().analysis
+        recent_window = (
+            recent_window if recent_window is not None else settings.expansion_recent_window
+        )
+        baseline_window = (
+            baseline_window
+            if baseline_window is not None
+            else settings.expansion_baseline_window
+        )
+
         if recent_window < 1:
             raise ValueError("recent_window must be >= 1")
         if baseline_window < 1:

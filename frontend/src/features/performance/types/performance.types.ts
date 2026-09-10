@@ -4,3 +4,20 @@ export interface PerformanceMetric {
   subtext?: string;
   isPositive?: boolean;
 }
+
+export interface PerformanceDay {
+  date: string;
+  pnl: number;
+  tradesCount: number;
+}
+
+export interface PerformanceResponse {
+  metrics: PerformanceMetric[];
+  winCount: number;
+  lossCount: number;
+  avgWin: number;
+  avgLoss: number;
+  dailyPnl: PerformanceDay[];
+  totalTrades: number;
+}
+

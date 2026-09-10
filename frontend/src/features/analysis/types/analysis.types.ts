@@ -37,3 +37,18 @@ export interface SweepEvent {
   sweepType: 'HIGH_SWEEP' | 'LOW_SWEEP';
   reactionMagnitudePips: number;
 }
+
+export interface AnalysisStatusData {
+  symbol: string;
+  hasData: boolean;
+  regime: string | null;
+  atr: number | null;
+  compressionRatio: number | null;
+  isCompressed: boolean;
+  expansionRatio: number | null;
+  isExpanded: boolean;
+  higherTimeframeStructure: string | null;
+  executionTimeframeStructure: string | null;
+  lastStructureBreak: string | null;
+}
+

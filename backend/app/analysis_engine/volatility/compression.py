@@ -19,6 +19,7 @@ from typing import List, Sequence
 
 from app.analysis_engine.domain.candle import Candle
 from app.analysis_engine.volatility.analyzer import VolatilityAnalyzer
+from app.core.settings import get_settings
 
 
 @dataclass(frozen=True)
@@ -45,14 +46,30 @@ class CompressionDetector:
     contraction_threshold: recent_avg_range must be <= this fraction
         of baseline_avg_range to count as compressed (e.g. 0.6 means
         range must have shrunk to 60% or less of baseline).
+
+    recent_window and baseline_window default to core/settings.py's
+    AnalysisEngineSettings when left as None, so they're configurable
+    via env vars instead of hardcoded. contraction_threshold has no
+    corresponding setting yet, so it keeps its literal default — pass
+    it explicitly if you want it configurable too.
     """
 
     def __init__(
         self,
-        recent_window: int = 5,
-        baseline_window: int = 20,
+        recent_window: int | None = None,
+        baseline_window: int | None = None,
         contraction_threshold: float = 0.6,
     ) -> None:
+        settings = get_settings().analysis
+        recent_window = (
+            recent_window if recent_window is not None else settings.compression_recent_window
+        )
+        baseline_window = (
+            baseline_window
+            if baseline_window is not None
+            else settings.compression_baseline_window
+        )
+
         if recent_window < 1:
             raise ValueError("recent_window must be >= 1")
         if baseline_window < 1:

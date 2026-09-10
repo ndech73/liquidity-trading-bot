@@ -4,7 +4,7 @@ export const ChartToolbar: React.FC<{
   timeframe: string;
   onTimeframeChange: (tf: string) => void;
 }> = ({ timeframe, onTimeframeChange }) => {
-  const timeframes = ['M1', 'M5', 'M15', 'H1', 'H4', 'D1'];
+  const timeframes = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1', 'MN'];
 
   return (
     <div className="flex items-center justify-between pb-3 border-b border-slate-800">

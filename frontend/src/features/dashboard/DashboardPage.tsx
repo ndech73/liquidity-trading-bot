@@ -7,14 +7,27 @@ import { DailyPerformance } from './components/DailyPerformance';
 import { WeeklyPerformance } from './components/WeeklyPerformance';
 import { PerformanceChart } from './components/PerformanceChart';
 import { Spinner } from '../../shared/components/Spinner';
+import { ErrorState } from '../../shared/components/ErrorState';
 
 export const DashboardPage: React.FC = () => {
-  const { stats, daily, isLoading } = useDashboard();
+  const { stats, daily, trades, isLoading, error, refetch } = useDashboard();
 
-  if (isLoading || !stats) {
+  if (isLoading) {
     return (
       <PageContainer title="Dashboard" subtitle="System overview and live trading status">
         <Spinner size="lg" className="py-20" />
+      </PageContainer>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <PageContainer title="Dashboard" subtitle="System overview and live trading status">
+        <ErrorState
+          message={error || 'Failed to connect to trading backend.'}
+          onRetry={refetch}
+          className="my-10"
+        />
       </PageContainer>
     );
   }
@@ -26,11 +39,11 @@ export const DashboardPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <PerformanceChart />
-            <RunningTradesSummary />
+            <RunningTradesSummary trades={trades} />
           </div>
           <div className="space-y-6">
             <DailyPerformance data={daily} />
-            <WeeklyPerformance />
+            <WeeklyPerformance data={daily} />
           </div>
         </div>
       </div>

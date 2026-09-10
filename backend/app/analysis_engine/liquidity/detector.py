@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Sequence
 
 from app.analysis_engine.domain.candle import Candle
@@ -9,6 +9,15 @@ from app.analysis_engine.domain.liquidity import (
     LiquidityType,
     LiquidityZone,
 )
+from app.core.settings import get_settings
+
+
+def _default_lookback() -> int:
+    return get_settings().analysis.liquidity_lookback
+
+
+def _default_tolerance_pct() -> float:
+    return get_settings().analysis.equal_level_tolerance_pct
 
 
 @dataclass
@@ -21,10 +30,15 @@ class LiquidityDetector:
     equal_level_tolerance_pct: how close two swing prices must be, as a
         fraction of price, to be treated as "the same level" (e.g. 0.0005
         means within 0.05% of each other).
+
+    Both fields default to core/settings.py's AnalysisEngineSettings via
+    default_factory, so the defaults live in one place (env vars / .env)
+    instead of being hardcoded here. Passing an explicit value (e.g. in
+    tests, or via LiquidityDetector(lookback=2, ...)) still overrides it.
     """
 
-    lookback: int = 2
-    equal_level_tolerance_pct: float = 0.0005
+    lookback: int = field(default_factory=_default_lookback)
+    equal_level_tolerance_pct: float = field(default_factory=_default_tolerance_pct)
 
     def detect(self, candles: Sequence[Candle]) -> list[LiquidityZone]:
         swing_zones = self._find_swing_points(candles)

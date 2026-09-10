@@ -16,7 +16,14 @@ class MarketContextBuilder:
         self.volatility_analyzer = volatility_analyzer
         self.structure_analyzer = structure_analyzer
 
-    def build(self, candles: Sequence[Candle]) -> dict:
+    def build(self, snapshot, candles: Sequence[Candle]) -> dict:
+        # snapshot already has zones/volatility/compression/expansion
+        # computed by AnalysisEngine — recomputing liquidity/volatility
+        # here from raw candles duplicates that work. Left as-is for now
+        # since I don't want to change this pipeline's behavior without
+        # you confirming; worth revisiting once structure/analyzer.py is
+        # restored, so this can pull from `snapshot` instead of redoing
+        # detection from scratch.
         return {
             "liquidity": self.liquidity_detector.detect(candles),
             "volatility": self.volatility_analyzer.analyze(candles),

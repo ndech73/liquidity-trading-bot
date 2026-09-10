@@ -24,6 +24,8 @@ if ss -tlpn 2>/dev/null | grep -q ":$PORT "; then
     exit 0
 fi
 
-echo "Starting MT5 Wine Bridge on port $PORT..."
+export WINEPREFIX="${WINEPREFIX:-$HOME/.mt5}"
+
+echo "Starting MT5 Wine Bridge on port $PORT (WINEPREFIX=$WINEPREFIX)..."
 echo "To test connection in Python: from app.execution.mt5_executor import MT5Executor; MT5Executor().connect()"
 exec wine "$SERVER_EXE" -p "$PORT"
