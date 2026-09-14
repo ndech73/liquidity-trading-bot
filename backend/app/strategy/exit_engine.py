@@ -25,6 +25,14 @@ class ExitReason(str, Enum):
     TAKE_PROFIT = "take_profit"
 
 
+class ExitType(str, Enum):
+    TP1 = "TP1"
+    TP2 = "TP2"
+    EARLY_BREAKEVEN = "EARLY_BREAKEVEN"
+    FULL_STOP_LOSS = "FULL_STOP_LOSS"
+    FRIDAY_CLOSE = "FRIDAY_CLOSE"
+
+
 @dataclass(frozen=True)
 class ExitLevels:
     """The two prices that end a trade, plus the ratio used to derive
@@ -44,12 +52,16 @@ class ExitEngine:
         Default is 100.0 pips.
     risk_reward_ratio: how many multiples of the risked distance (entry_price to stop_loss)
         the take_profit sits at if take_profit_pips is None.
+    early_breakeven_trigger_pips: profit in pips required to activate break-even protection.
+    early_breakeven_buffer_pips: buffer in pips added to entry when moving stop loss to break-even.
     """
 
     def __init__(
         self,
         risk_reward_ratio: float = 3.0,
         take_profit_pips: float | None = None,
+        early_breakeven_trigger_pips: float | None = None,
+        early_breakeven_buffer_pips: float | None = None,
     ) -> None:
         if risk_reward_ratio <= 0:
             raise ValueError("risk_reward_ratio must be > 0")
@@ -58,10 +70,34 @@ class ExitEngine:
         self.risk_reward_ratio = risk_reward_ratio
         self.take_profit_pips = take_profit_pips
 
-    def compute_exit_levels(self, entry: EntrySignal, pip_size: float | None = None) -> ExitLevels:
+        settings = None
+        try:
+            from app.core.settings import get_settings
+            settings = get_settings().analysis
+        except Exception:
+            pass
+
+        self.early_breakeven_trigger_pips = (
+            early_breakeven_trigger_pips
+            if early_breakeven_trigger_pips is not None
+            else (getattr(settings, "early_breakeven_trigger_pips", 15.0) if settings else 15.0)
+        )
+        self.early_breakeven_buffer_pips = (
+            early_breakeven_buffer_pips
+            if early_breakeven_buffer_pips is not None
+            else (getattr(settings, "early_breakeven_buffer_pips", 3.0) if settings else 3.0)
+        )
+
+    def compute_exit_levels(
+        self,
+        entry: EntrySignal,
+        pip_size: float | None = None,
+        custom_rr: float | None = None,
+    ) -> ExitLevels:
+        rr = custom_rr if custom_rr is not None else self.risk_reward_ratio
         risk = abs(entry.entry_price - entry.stop_loss)
 
-        if self.take_profit_pips is not None and self.take_profit_pips > 0:
+        if self.take_profit_pips is not None and self.take_profit_pips > 0 and custom_rr is None:
             if pip_size is None:
                 symbol_upper = getattr(entry, "symbol", "").upper()
                 pip_size = 0.01 if "JPY" in symbol_upper else 0.0001
@@ -80,14 +116,14 @@ class ExitEngine:
             )
 
         if entry.direction == TradeDirection.BUY:
-            take_profit = entry.entry_price + risk * self.risk_reward_ratio
+            take_profit = entry.entry_price + risk * rr
         else:
-            take_profit = entry.entry_price - risk * self.risk_reward_ratio
+            take_profit = entry.entry_price - risk * rr
 
         return ExitLevels(
             stop_loss=entry.stop_loss,
             take_profit=take_profit,
-            risk_reward_ratio=self.risk_reward_ratio,
+            risk_reward_ratio=rr,
         )
 
     def check_exit(
@@ -117,3 +153,94 @@ class ExitEngine:
                 return ExitReason.TAKE_PROFIT
 
         return None
+
+    def compute_breakeven_sl(
+        self,
+        direction: TradeDirection | str,
+        entry_price: float,
+        pip_size: float,
+        buffer_pips: float | None = None,
+    ) -> float:
+        """
+        Computes the break-even stop loss price with the specified buffer.
+        For BUY: entry_price + (buffer_pips * pip_size)
+        For SELL: entry_price - (buffer_pips * pip_size)
+        """
+        buf = buffer_pips if buffer_pips is not None else self.early_breakeven_buffer_pips
+        dir_str = direction.value.upper() if isinstance(direction, TradeDirection) else str(direction).upper()
+        if dir_str == "BUY":
+            return round(entry_price + (buf * pip_size), 5)
+        else:
+            return round(entry_price - (buf * pip_size), 5)
+
+    def should_trigger_breakeven(
+        self,
+        direction: TradeDirection | str,
+        entry_price: float,
+        current_price: float,
+        pip_size: float,
+        trigger_pips: float | None = None,
+    ) -> bool:
+        """
+        Checks whether unrealized profit meets or exceeds the break-even trigger threshold.
+        """
+        trig = trigger_pips if trigger_pips is not None else self.early_breakeven_trigger_pips
+        dir_str = direction.value.upper() if isinstance(direction, TradeDirection) else str(direction).upper()
+        if dir_str == "BUY":
+            profit_pips = (current_price - entry_price) / pip_size
+        else:
+            profit_pips = (entry_price - current_price) / pip_size
+        return profit_pips >= trig - 1e-9
+
+    def determine_exit_type(
+        self,
+        direction: TradeDirection | str,
+        entry_price: float,
+        exit_price: float,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        is_breakeven: bool = False,
+        is_friday_close: bool = False,
+        tp_label: str | None = None,
+        pip_size: float = 0.0001,
+    ) -> ExitType:
+        """
+        Determines whether an exit corresponds to TP1, TP2, EARLY_BREAKEVEN, FULL_STOP_LOSS, or FRIDAY_CLOSE.
+        """
+        if is_friday_close:
+            return ExitType.FRIDAY_CLOSE
+
+        dir_str = direction.value.upper() if isinstance(direction, TradeDirection) else str(direction).upper()
+        is_buy = dir_str == "BUY"
+        profit_pips = ((exit_price - entry_price) / pip_size) if is_buy else ((entry_price - exit_price) / pip_size)
+
+        # 1. Take Profit hit
+        if take_profit is not None:
+            tp_reached = (exit_price >= take_profit - (pip_size * 0.5)) if is_buy else (exit_price <= take_profit + (pip_size * 0.5))
+            if tp_reached:
+                if tp_label and str(tp_label).upper() in ("TP2", "2"):
+                    return ExitType.TP2
+                return ExitType.TP1
+
+        if tp_label and str(tp_label).upper() in ("TP1", "TP2") and profit_pips > 0:
+            if not (is_breakeven and abs(profit_pips - self.early_breakeven_buffer_pips) < 2.0):
+                return ExitType.TP2 if str(tp_label).upper() == "TP2" else ExitType.TP1
+
+        # 2. Break-Even hit
+        sl_is_be = False
+        if stop_loss is not None:
+            if is_buy and stop_loss >= entry_price - 1e-9:
+                sl_is_be = True
+            elif not is_buy and stop_loss <= entry_price + 1e-9:
+                sl_is_be = True
+
+        if is_breakeven or sl_is_be:
+            if profit_pips >= -1.0:
+                return ExitType.EARLY_BREAKEVEN
+
+        # 3. If in clear profit but TP level was not explicitly set
+        if profit_pips > 0 and not is_breakeven:
+            return ExitType.TP2 if tp_label and str(tp_label).upper() in ("TP2", "2") else ExitType.TP1
+
+        # 4. Full Stop Loss
+        return ExitType.FULL_STOP_LOSS

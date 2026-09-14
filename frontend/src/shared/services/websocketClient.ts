@@ -30,20 +30,45 @@ class WebSocketClient {
     }
   }
 
-  public connect(url: string = ENV.WS_URL) {
+  private candidateIndex = 0;
+
+  private getCandidateUrls(primaryUrl?: string): string[] {
+    const urls: string[] = [];
+    if (primaryUrl) urls.push(primaryUrl);
+    if (ENV.WS_URL && !urls.includes(ENV.WS_URL)) urls.push(ENV.WS_URL);
+
+    if (typeof window !== 'undefined') {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const candidates = [
+        'ws://127.0.0.1:8000/ws',
+        'ws://127.0.0.1:8000/api/ws',
+        `${protocol}//${window.location.host}/ws`,
+        `${protocol}//${window.location.host}/api/ws`,
+      ];
+      candidates.forEach((u) => {
+        if (!urls.includes(u)) urls.push(u);
+      });
+    }
+    return urls;
+  }
+
+  public connect(requestedUrl?: string) {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
+
+    const candidates = this.getCandidateUrls(requestedUrl);
+    const targetUrl = candidates[this.candidateIndex % candidates.length] || ENV.WS_URL;
 
     this.isExplicitlyClosed = false;
     this.setStatus('connecting');
 
     try {
-      this.ws = new WebSocket(url);
+      this.ws = new WebSocket(targetUrl);
 
       this.ws.onopen = () => {
         this.setStatus('connected');
-        console.info('[WebSocket] Connected to', url);
+        console.info('[WebSocket] Connected to', targetUrl);
         this.startHeartbeat();
       };
 
@@ -60,22 +85,24 @@ class WebSocketClient {
         this.stopHeartbeat();
         this.setStatus('disconnected');
         if (!this.isExplicitlyClosed) {
-          console.warn('[WebSocket] Disconnected. Reconnecting in', this.reconnectInterval, 'ms');
+          this.candidateIndex++;
+          console.warn('[WebSocket] Disconnected. Cycling to next endpoint in', this.reconnectInterval, 'ms');
           if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-          this.reconnectTimer = setTimeout(() => this.connect(url), this.reconnectInterval);
+          this.reconnectTimer = setTimeout(() => this.connect(), this.reconnectInterval);
         }
       };
 
       this.ws.onerror = (err) => {
         this.setStatus('error');
-        console.error('[WebSocket] Socket error:', err);
+        console.error('[WebSocket] Socket error on', targetUrl, err);
       };
     } catch (err) {
       this.setStatus('error');
-      console.error('[WebSocket] Connection failed:', err);
+      console.error('[WebSocket] Connection attempt failed for', targetUrl, err);
       if (!this.isExplicitlyClosed) {
+        this.candidateIndex++;
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = setTimeout(() => this.connect(url), this.reconnectInterval);
+        this.reconnectTimer = setTimeout(() => this.connect(), this.reconnectInterval);
       }
     }
   }

@@ -12,11 +12,14 @@ router = APIRouter()
 @router.get("/account")
 def get_account(db: Session = Depends(get_db)):
     """Returns live account metrics from MT5 or persistent state."""
-    db_status = check_db_connection()
-
     # Calculate open metrics from DB if MT5 isn't initialized with credentials
-    open_trades = db.query(TradeModel).filter_by(status="OPEN").all()
-    open_pnl = sum(t.profit for t in open_trades) if open_trades else 0.0
+    open_trades = []
+    open_pnl = 0.0
+    try:
+        open_trades = db.query(TradeModel).filter_by(status="OPEN").all()
+        open_pnl = sum(t.profit for t in open_trades) if open_trades else 0.0
+    except Exception:
+        pass
 
     account_data = {
         "login": None,

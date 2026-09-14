@@ -19,7 +19,9 @@ class TradeModel(Base):
     stop_loss: Mapped[float | None] = mapped_column(Float, nullable=True)
     take_profit: Mapped[float | None] = mapped_column(Float, nullable=True)
     profit: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    exit_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="OPEN", index=True, nullable=False)  # OPEN, CLOSED, CANCELLED
+    timeframe: Mapped[str | None] = mapped_column(String(10), default="15m", nullable=True)
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)

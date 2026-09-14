@@ -75,19 +75,22 @@ class RiskEngine:
                 reason="Invalid stop loss: distance to entry is zero",
             )
 
-        # 5. Position Sizing
-        # For small demo accounts (e.g. < $50), safely trade minimum lot size (0.01 lot)
+        # 5. Position Sizing (Fixed 0.05 default or dynamically scaled above $50)
+        is_jpy = "JPY" in symbol.upper()
+        pip_size = 0.01 if is_jpy else 0.0001
+        pips_at_risk = sl_dist / pip_size
+        pip_value_std = 6.5 if is_jpy else 10.0
+
         computed_lot = self.default_lot_size
         if balance > 50.0:
             risk_capital = balance * self.risk_per_trade_pct
-            # 1 standard lot = 100,000 units, roughly $10/pip for EUR/USD
-            pip_size = 0.0001
-            pips_at_risk = sl_dist / pip_size
             if pips_at_risk > 0:
-                raw_lots = risk_capital / (pips_at_risk * 10.0)
+                raw_lots = risk_capital / (pips_at_risk * pip_value_std)
                 computed_lot = max(self.min_lot_size, min(round(raw_lots, 2), self.max_lot_size))
+        else:
+            computed_lot = self.default_lot_size
 
-        risk_amount = round(sl_dist * 100000 * computed_lot, 2)
+        risk_amount = round(pips_at_risk * pip_value_std * computed_lot, 2)
 
         return RiskAssessment(
             approved=True,

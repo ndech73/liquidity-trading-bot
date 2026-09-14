@@ -59,19 +59,16 @@ class ExpansionDetector:
         range to count as a clear direction, rather than NEUTRAL
         (choppy back-and-forth that nets out near zero).
 
-    recent_window and baseline_window default to core/settings.py's
-    AnalysisEngineSettings when left as None. expansion_threshold and
-    direction_threshold have no corresponding settings yet, so they
-    keep their literal defaults — pass them explicitly if you want
-    those configurable too.
+    recent_window, baseline_window, expansion_threshold, and direction_threshold
+    default to core/settings.py's AnalysisEngineSettings when left as None.
     """
 
     def __init__(
         self,
         recent_window: int | None = None,
         baseline_window: int | None = None,
-        expansion_threshold: float = 1.5,
-        direction_threshold: float = 0.3,
+        expansion_threshold: float | None = None,
+        direction_threshold: float | None = None,
     ) -> None:
         settings = get_settings().analysis
         recent_window = (
@@ -81,6 +78,16 @@ class ExpansionDetector:
             baseline_window
             if baseline_window is not None
             else settings.expansion_baseline_window
+        )
+        expansion_threshold = (
+            expansion_threshold
+            if expansion_threshold is not None
+            else getattr(settings, "expansion_threshold", 1.5)
+        )
+        direction_threshold = (
+            direction_threshold
+            if direction_threshold is not None
+            else getattr(settings, "direction_threshold", 0.3)
         )
 
         if recent_window < 1:
@@ -98,7 +105,7 @@ class ExpansionDetector:
         self.direction_threshold = direction_threshold
         self._volatility_analyzer = VolatilityAnalyzer()
 
-    def analyze(self, candles: Sequence[Candle]) -> List[ExpansionReading]:
+    def analyze(self, candles: Sequence[Candle], latest_only: bool = False) -> List[ExpansionReading]:
         """
         Full pipeline: candles -> true ranges -> an ExpansionReading for
         every point where both a recent window and a preceding baseline
@@ -110,6 +117,36 @@ class ExpansionDetector:
             return []
 
         readings: List[ExpansionReading] = []
+
+        if latest_only:
+            i = len(true_ranges) - 1
+            recent_slice = true_ranges[i - self.recent_window + 1 : i + 1]
+            baseline_slice = true_ranges[
+                i - min_required + 1 : i - self.recent_window + 1
+            ]
+
+            recent_avg = mean(recent_slice)
+            baseline_avg = mean(baseline_slice)
+
+            ratio = recent_avg / baseline_avg if baseline_avg else 0.0
+            is_expanding = ratio >= self.expansion_threshold
+
+            recent_candles = candles[
+                i - self.recent_window + 2 : i + 2
+            ]
+            direction = self._classify_direction(recent_candles, recent_avg)
+
+            readings.append(
+                ExpansionReading(
+                    timestamp=candles[i + 1].timestamp,
+                    recent_avg_range=recent_avg,
+                    baseline_avg_range=baseline_avg,
+                    expansion_ratio=ratio,
+                    is_expanding=is_expanding,
+                    direction=direction,
+                )
+            )
+            return readings
 
         for i in range(min_required - 1, len(true_ranges)):
             recent_slice = true_ranges[i - self.recent_window + 1 : i + 1]

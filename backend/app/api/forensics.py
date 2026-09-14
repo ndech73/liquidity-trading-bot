@@ -51,6 +51,8 @@ def get_forensics(db: Session = Depends(get_db)):
             "lots": t.lots,
             "openPrice": t.open_price,
             "closePrice": t.close_price,
+            "stopLoss": t.stop_loss,
+            "takeProfit": t.take_profit,
             "profit": t.profit,
             "orderType": t.order_type,
             "riskRewardRatio": rr,

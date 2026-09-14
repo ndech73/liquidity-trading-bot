@@ -54,21 +54,24 @@ def get_trades(db: Session = Depends(get_db)):
 
     # 2. If MT5 returned positions, return them; otherwise check persistent DB for OPEN trades
     if not trades:
-        db_trades = db.query(TradeModel).filter_by(status="OPEN").all()
-        for t in db_trades:
-            trades.append({
-                "id": t.id,
-                "ticket": t.ticket,
-                "symbol": t.symbol,
-                "type": t.order_type,
-                "lots": t.lots,
-                "openPrice": t.open_price,
-                "currentPrice": t.close_price or t.open_price,
-                "stopLoss": t.stop_loss or 0.0,
-                "takeProfit": t.take_profit or 0.0,
-                "profit": t.profit,
-                "openTime": t.opened_at.strftime("%Y-%m-%d %H:%M:%S"),
-            })
+        try:
+            db_trades = db.query(TradeModel).filter_by(status="OPEN").all()
+            for t in db_trades:
+                trades.append({
+                    "id": t.id,
+                    "ticket": t.ticket,
+                    "symbol": t.symbol,
+                    "type": t.order_type,
+                    "lots": t.lots,
+                    "openPrice": t.open_price,
+                    "currentPrice": t.close_price or t.open_price,
+                    "stopLoss": t.stop_loss or 0.0,
+                    "takeProfit": t.take_profit or 0.0,
+                    "profit": t.profit,
+                    "openTime": t.opened_at.strftime("%Y-%m-%d %H:%M:%S"),
+                })
+        except Exception as e:
+            pass
 
     return trades
 
@@ -76,20 +79,23 @@ def get_trades(db: Session = Depends(get_db)):
 @router.get("/trades/history")
 def get_trade_history(db: Session = Depends(get_db)):
     """Returns closed trade records from the database."""
-    history = db.query(TradeModel).filter_by(status="CLOSED").order_by(TradeModel.closed_at.desc()).limit(100).all()
-    return [
-        {
-            "id": t.id,
-            "ticket": t.ticket,
-            "symbol": t.symbol,
-            "type": t.order_type,
-            "lots": t.lots,
-            "openPrice": t.open_price,
-            "closePrice": t.close_price or 0.0,
-            "profit": t.profit,
-            "status": t.status,
-            "openedAt": t.opened_at.isoformat(),
-            "closedAt": t.closed_at.isoformat() if t.closed_at else None,
-        }
-        for t in history
-    ]
+    try:
+        history = db.query(TradeModel).filter_by(status="CLOSED").order_by(TradeModel.closed_at.desc()).limit(100).all()
+        return [
+            {
+                "id": t.id,
+                "ticket": t.ticket,
+                "symbol": t.symbol,
+                "type": t.order_type,
+                "lots": t.lots,
+                "openPrice": t.open_price,
+                "closePrice": t.close_price or 0.0,
+                "profit": t.profit,
+                "status": t.status,
+                "openedAt": t.opened_at.isoformat(),
+                "closedAt": t.closed_at.isoformat() if t.closed_at else None,
+            }
+            for t in history
+        ]
+    except Exception as e:
+        return []

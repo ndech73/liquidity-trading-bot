@@ -1,5 +1,5 @@
 import React from 'react';
-import { PanelLeftClose, PanelLeftOpen, Activity, Wallet, Radio } from 'lucide-react';
+import { Activity, Wallet, Radio } from 'lucide-react';
 
 export interface TopbarProps {
   botStatus?: 'RUNNING' | 'PAUSED' | 'OFFLINE';
@@ -12,27 +12,11 @@ export interface TopbarProps {
 export const Topbar: React.FC<TopbarProps> = ({
   botStatus = 'OFFLINE',
   accountBalance = 0,
-  isSidebarCollapsed = false,
-  onToggleSidebar,
   isWsConnected = false,
 }) => {
   return (
     <header className="h-16 bg-slate-900 border-b border-slate-800 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20">
       <div className="flex items-center gap-3">
-        {onToggleSidebar && (
-          <button
-            onClick={onToggleSidebar}
-            title={isSidebarCollapsed ? 'Reveal sidebar' : 'Collapse sidebar'}
-            aria-label={isSidebarCollapsed ? 'Reveal sidebar' : 'Collapse sidebar'}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors hidden md:flex items-center justify-center cursor-pointer"
-          >
-            {isSidebarCollapsed ? (
-              <PanelLeftOpen className="w-5 h-5 text-sky-400" />
-            ) : (
-              <PanelLeftClose className="w-5 h-5" />
-            )}
-          </button>
-        )}
         <span className="text-sm font-semibold tracking-wider uppercase text-slate-300 hidden sm:inline">
           Liquidity Trading System
         </span>

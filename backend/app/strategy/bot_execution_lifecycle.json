@@ -1,0 +1,298 @@
+{
+  "meta": {
+    "title": "Liquidity Trading Bot - Complete Operational Lifecycle & Step-by-Step Architecture",
+    "version": "2.0.0",
+    "strategy_name": "Smart Money Liquidity Sweep & Multi-Target Execution",
+    "description": "Comprehensive reference document detailing every discrete step the bot takes from raw market data ingestion and liquidity zone detection to risk evaluation, order dispatch, and dynamic trade exit.",
+    "execution_timeframe": "M15 (15 Minutes)",
+    "higher_timeframe": "H1 (1 Hour)",
+    "active_watchlist": [
+      "EURJPY",
+      "USDCHF",
+      "NZDUSD",
+      "USDCAD",
+      "GBPUSD"
+    ],
+    "default_lot_size": 0.05,
+    "max_stop_loss_cap_pips": 35.0,
+    "session_killzone_utc": "07:00 - 18:00 UTC",
+    "friday_close_hour_utc": "20:00 UTC",
+    "early_breakeven_pips": 10.0,
+    "early_breakeven_buffer_pips": 1.0
+  },
+  "core_thesis": {
+    "concept": "Institutional Liquidity Hunts",
+    "explanation": "Retail stop-loss orders and breakout buy/sell stop orders accumulate in dense pools above swing highs and below swing lows. Institutional algorithms intentionally drive prices past these key levels to absorb resting liquidity before violently reversing in the true market direction.",
+    "bot_edge": "The bot avoids entering during consolidation or breakout chasing. Instead, it waits for the liquidity sweep to complete, confirms institutional absorption via wick rejection, and enters on the reversal back inside the range with asymmetric multi-target exits."
+  },
+  "phases": [
+    {
+      "phase_number": 1,
+      "phase_name": "Market Data Ingestion & Multi-Timeframe Synchronization",
+      "component": "app.execution.mt5_executor.MT5Executor & app.strategy.trading_runner.TradingRunner",
+      "steps": [
+        {
+          "step_id": "1.1",
+          "name": "Wine MT5 RPC Bridge Connection",
+          "action": "Connects to MetaTrader 5 running in Wine environment over internal RPC bridge on 127.0.0.1:18812.",
+          "verification": "Ensures MT5 terminal is initialized, authenticated with broker, and market data feed is active."
+        },
+        {
+          "step_id": "1.2",
+          "name": "Multi-Timeframe Candle Polling",
+          "action": "Every 10 seconds (poll interval), requests the latest completed candles for each active symbol.",
+          "timeframes": {
+            "execution": "M15 candles (120 candles lookback window for primary signal detection)",
+            "context": "H1 candles (50 candles lookback window for macro market structure & trend confluence)"
+          }
+        },
+        {
+          "step_id": "1.3",
+          "name": "Lookahead Bias Prevention",
+          "action": "Slices H1 candles strictly up to the completion of the prior 1-hour bar. Incomplete bars are strictly excluded so the bot never peeks into future price data."
+        }
+      ]
+    },
+    {
+      "phase_number": 2,
+      "phase_name": "Analysis Engine: Market Structure & Liquidity Zone Detection",
+      "component": "app.analysis_engine.engine.AnalysisEngine",
+      "steps": [
+        {
+          "step_id": "2.1",
+          "name": "Volatility & Regime Calculation",
+          "module": "app.analysis_engine.volatility.analyzer.VolatilityAnalyzer",
+          "action": "Computes current Average True Range (ATR), 20-period baseline ATR, and compression/expansion ratios.",
+          "regimes": [
+            "COMPRESSION: Market is coiling in a narrow range prior to an expansion burst.",
+            "EXPANSION: Explosive volatility expansion, confirming high momentum.",
+            "NORMAL: Standard cyclical movement.",
+            "HIGH_VOLATILITY: Extreme market swings where wider stop buffers are required."
+          ]
+        },
+        {
+          "step_id": "2.2",
+          "name": "Market Structure & Trend Determination",
+          "module": "app.analysis_engine.structure.analyzer.MarketStructureAnalyzer",
+          "action": "Scans swing highs and swing lows over 120 candles. Identifies Break of Structure (BOS) and Change of Character (CHoCH).",
+          "output": "Classifies trend as BULLISH, BEARISH, or RANGING."
+        },
+        {
+          "step_id": "2.3",
+          "name": "Liquidity Zone Mapping",
+          "module": "app.analysis_engine.liquidity.detector.LiquidityDetector",
+          "action": "Maps clusters where resting liquidity is primed for sweeping.",
+          "zone_types": [
+            "EQUAL_HIGHS (EQH): Double/triple tops where retail stops sit directly above.",
+            "EQUAL_LOWS (EQL): Double/triple bottoms where sell-stops sit directly below.",
+            "SWING_HIGH_LIQUIDITY: Unmitigated major resistance highs with buy-side liquidity.",
+            "SWING_LOW_LIQUIDITY: Unmitigated major support lows with sell-side liquidity.",
+            "SESSION_HIGHS_LOWS: Asian session highs/lows and previous day highs/lows."
+          ]
+        }
+      ]
+    },
+    {
+      "phase_number": 3,
+      "phase_name": "Liquidity Sweep Identification",
+      "component": "app.analysis_engine.liquidity.sweep_detector.SweepDetector",
+      "steps": [
+        {
+          "step_id": "3.1",
+          "name": "Boundary Penetration Detection",
+          "action": "Detects when price candle wick pierces beyond the upper bound of a resistance liquidity zone or below the lower bound of a support liquidity zone.",
+          "condition": "Price penetrates the zone by at least 0 ticks (min_penetration_ticks)."
+        },
+        {
+          "step_id": "3.2",
+          "name": "Candle Rejection Anatomy Verification",
+          "action": "Evaluates the wick-to-body ratio of the piercing candle.",
+          "rules": [
+            "Min Rejection Wick Ratio: Wick must constitute at least 50% of total candle range.",
+            "Close Proximity: Candle close must be within 35% of the opposite extreme (proving buyers/sellers were rejected and pushed price back inside)."
+          ]
+        },
+        {
+          "step_id": "3.3",
+          "name": "Relative Volume Confirmation",
+          "action": "Verifies that tick volume on the sweep candle is at least 1.2x the 20-period volume moving average, confirming institutional participation rather than retail drift."
+        },
+        {
+          "step_id": "3.4",
+          "name": "Sweep Event Creation",
+          "action": "Constructs a LiquiditySweepEvent object containing symbol, side (BUY/SELL liquidity), level price, penetration depth, and timestamp."
+        }
+      ]
+    },
+    {
+      "phase_number": 4,
+      "phase_name": "Pre-Trade Strategy Filters (Entry Engine)",
+      "component": "app.strategy.entry_engine.EntryEngine",
+      "steps": [
+        {
+          "step_id": "4.1",
+          "name": "Session Killzone Filter",
+          "action": "Verifies UTC timestamp of current candle against the active session killzone (07:00 - 18:00 UTC).",
+          "rationale": "Filters out illiquid Asian session drift and off-market hours. Confines trading to London Open, London/NY Overlap, and Early NY trading sessions where true institutional volume exists."
+        },
+        {
+          "step_id": "4.2",
+          "name": "High-Impact News & Volatility Spike Filter",
+          "module": "app.strategy.news_filter.NewsFilter",
+          "action": "Checks economic calendar for high-impact releases (CPI, NFP, FOMC, Rate Decisions) within +/- 30 minutes. Concurrently checks if recent candle spread exceeds 2.5x the rolling 20-period ATR.",
+          "outcome": "If news or volatility shock is detected, the setup is blocked to prevent spread-widening slippage."
+        },
+        {
+          "step_id": "4.3",
+          "name": "Targeted Higher-Timeframe (H1) Alignment",
+          "action": "For designated trending pairs (e.g., GBPUSD), ensures the M15 sweep direction agrees with the H1 macro trend. For mean-reverting/ranging pairs (USDCHF, USDCAD, EURJPY), allows trading sweeps of range boundaries without being blocked."
+        },
+        {
+          "step_id": "4.4",
+          "name": "M15 Market Structure Trend Alignment",
+          "action": "Ensures trade direction is aligned with market structure: Buy setups require Bullish or Ranging trend; Sell setups require Bearish or Ranging trend."
+        },
+        {
+          "step_id": "4.5",
+          "name": "Max Stop Loss Cap (35.0 Pips)",
+          "action": "Calculates required technical stop loss (zone extreme + buffer ticks). If distance exceeds 35.0 pips, the trade is rejected.",
+          "rationale": "Completely eliminates outlier stop-loss losses caused by flash spikes or wide ATRs (e.g. prevents 100+ pip blowouts)."
+        },
+        {
+          "step_id": "4.6",
+          "name": "EntrySignal Generation",
+          "action": "Once all 5 filters pass, constructs EntrySignal containing direction (BUY or SELL), entry price, recommended stop loss, zone ID, and timestamp."
+        }
+      ]
+    },
+    {
+      "phase_number": 5,
+      "phase_name": "Risk Assessment & Position Sizing",
+      "component": "app.risk.risk_engine.RiskEngine",
+      "steps": [
+        {
+          "step_id": "5.1",
+          "name": "Account Margin & Capital Verification",
+          "action": "Queries broker account for balance, equity, and free margin.",
+          "rule": "Rejects trade if free margin is below $2.00 or insufficient to cover required margin."
+        },
+        {
+          "step_id": "5.2",
+          "name": "Watchlist Whitelist Validation",
+          "action": "Confirms symbol belongs to the approved 5-pair production basket (EURJPY, USDCHF, NZDUSD, USDCAD, GBPUSD)."
+        },
+        {
+          "step_id": "5.3",
+          "name": "Per-Symbol Position Limit",
+          "action": "Checks number of currently open positions on the candidate symbol.",
+          "rule": "Max 2 open trades per symbol (representing Position 1 and Position 2 of a single setup). Prevents double-dipping or revenge trading on the same pair."
+        },
+        {
+          "step_id": "5.4",
+          "name": "Total Account Exposure Cap",
+          "action": "Verifies total open positions across all symbols in the account.",
+          "rule": "Max 10 total open positions account-wide (ensures account margin utilization never exceeds safe levels)."
+        },
+        {
+          "step_id": "5.5",
+          "name": "Lot Size Sizing",
+          "action": "Assigns fixed production lot size of 0.05 lots per position ($0.50 per pip). Eliminates lot-size volatility and ensures predictable equity curve progression."
+        }
+      ]
+    },
+    {
+      "phase_number": 6,
+      "phase_name": "Order Dispatch & Multi-Target Execution",
+      "component": "app.strategy.exit_engine.ExitEngine & app.execution.mt5_executor.MT5Executor",
+      "steps": [
+        {
+          "step_id": "6.1",
+          "name": "Dual-Position Split Calculation",
+          "action": "Splits the approved trade into two separate orders with identical entries and stop losses, but asymmetric profit targets:",
+          "targets": {
+            "position_1": "Conservative Target (TP1 @ 1.2R) - Fast liquidity exit to bank profit early.",
+            "position_2": "Runner Target (TP2 @ 3.0R) - Trend capture designed to ride multi-hour expansions."
+          }
+        },
+        {
+          "step_id": "6.2",
+          "name": "Stop Loss Level Setting",
+          "action": "Places Stop Loss at the structural extreme of the swept liquidity zone plus a small volatility buffer, capped strictly at 35.0 pips maximum."
+        },
+        {
+          "step_id": "6.3",
+          "name": "MT5 Market Order Dispatch",
+          "action": "Dispatches two separate market orders via MT5 RPC server:",
+          "order_1": "MT5 Order Type (BUY/SELL) | Volume: 0.05 | SL: Computed SL | TP: TP1 (1.2R) | Comment: 'LiquidityBot P1-R1.2'",
+          "order_2": "MT5 Order Type (BUY/SELL) | Volume: 0.05 | SL: Computed SL | TP: TP2 (3.0R) | Comment: 'LiquidityBot P2-R3.0'"
+        },
+        {
+          "step_id": "6.4",
+          "name": "Database Persistence & WebSocket Broadcast",
+          "action": "Stores trade records in SQL database (TradeModel) and broadcasts real-time open trade event via WebSocket to the React frontend dashboard."
+        }
+      ]
+    },
+    {
+      "phase_number": 7,
+      "phase_name": "Active Trade Lifecycle & Dynamic Exit Management",
+      "component": "app.strategy.trading_runner.TradingRunner",
+      "steps": [
+        {
+          "step_id": "7.1",
+          "name": "Continuous Tick & Candle Polling",
+          "action": "Monitors open trades on every iteration against current bid/ask prices and new incoming M15 candle extremes."
+        },
+        {
+          "step_id": "7.2",
+          "name": "Early Break-Even Auto-Trigger (+10.0 Pips)",
+          "action": "When unrealized profit on an open setup reaches +10.0 pips, the bot automatically modifies the Stop Loss order on MT5 to Entry Price + 1.0 pip buffer.",
+          "effect": "Eliminates all downside risk. If market suddenly reverses, trade exits at +1.0 pip profit rather than taking a loss."
+        },
+        {
+          "step_id": "7.3",
+          "name": "TP1 Execution (Position 1)",
+          "action": "Price hits 1.2R target. MT5 executes limit fill. Position 1 closes with profit banked into account balance."
+        },
+        {
+          "step_id": "7.4",
+          "name": "TP2 Execution (Position 2 Runner)",
+          "action": "If trend continues, Position 2 reaches 3.0R target and closes, locking in high-R gains."
+        },
+        {
+          "step_id": "7.5",
+          "name": "Full Stop Loss (Failed Setup)",
+          "action": "If price invalidates setup immediately without reaching +10.0 pips, MT5 triggers stop-loss at structural level (capped at 35 pips maximum)."
+        },
+        {
+          "step_id": "7.6",
+          "name": "Friday Weekend Auto-Close (20:00 UTC)",
+          "action": "At 20:00 UTC every Friday, the bot queries all open trades across the account and closes them at current market price.",
+          "rationale": "Eliminates catastrophic weekend gap risk caused by geopolitical events or Sunday market open slippage."
+        },
+        {
+          "step_id": "7.7",
+          "name": "Deal Reconciliation & Metrics Logging",
+          "action": "Fetches MT5 position deal history, calculates exact net profit/loss, slippage, and commission, updates TradeModel in database, and logs full forensic metrics."
+        }
+      ]
+    }
+  ],
+  "example_trade_scenario": {
+    "symbol": "EURJPY",
+    "direction": "BUY",
+    "setup_walkthrough": [
+      "1. 08:30 UTC: Market opens London session inside Killzone. EURJPY drops to test previous day low at 162.200 (Equal Lows / Sell-side Liquidity).",
+      "2. 08:45 UTC: An M15 candle pierces 162.200 down to 162.100 (10 pip sweep), absorbs sell orders, and aggressively rebounds to close at 162.280 with a 65% bottom wick. Relative volume is 1.45x average.",
+      "3. 08:45 UTC: NewsFilter confirms no EUR/JPY high-impact news in +/- 30m. ATR is 18 pips (normal regime).",
+      "4. 08:45 UTC: Stop Loss is placed at 161.950 (25 pips below entry, safely below 35-pip cap).",
+      "5. 08:45 UTC: RiskEngine confirms margin is healthy, no active EURJPY trades. Assigns 0.05 lots per position.",
+      "6. 08:45 UTC: ExitEngine computes Position 1 TP @ 162.580 (1.2R = +30 pips) and Position 2 TP @ 163.030 (3.0R = +75 pips).",
+      "7. 08:45 UTC: MT5Executor sends BUY order for Position 1 (#100201) and Position 2 (#100202) at 162.280.",
+      "8. 09:15 UTC: EURJPY rallies to 162.390 (+11 pips). Early Break-Even triggers! Stop Loss for both positions moves to 162.290 (+1 pip in profit). Trade is now 100% risk-free.",
+      "9. 10:30 UTC: EURJPY reaches 162.580. Position 1 hits TP1! Closes for +30.0 pips (+ $10.00 profit). Position 2 remains open.",
+      "10. 12:45 UTC: Strong European momentum continues. EURJPY hits 163.030. Position 2 hits TP2! Closes for +75.0 pips (+ $25.00 profit).",
+      "11. Summary: Setup completed. 2 wins, 0 losses. Total net profit: +$35.00 (+105.0 pips total)."
+    ]
+  }
+}

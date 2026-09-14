@@ -9,6 +9,10 @@ def init_db() -> bool:
     try:
         logger.info("Initializing database tables...")
         Base.metadata.create_all(bind=engine)
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE trades ADD COLUMN IF NOT EXISTS exit_type VARCHAR(30);"))
+            conn.commit()
         logger.success("Database tables initialized successfully.")
         return True
     except Exception as e:

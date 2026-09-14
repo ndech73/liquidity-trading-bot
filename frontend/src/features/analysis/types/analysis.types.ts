@@ -21,10 +21,13 @@ export interface LiquidityZone {
   priceLow: number;
   type: LiquidityType;
   liquidityType?: LiquidityType;
-  status?: LiquidityStatus;
+  status?: LiquidityStatus | 'ACTIVE' | 'SWEPT';
   strength?: number;
   isSwept: boolean;
+  touches?: number;
+  originTime?: number;
   createdAt?: string;
+  sweepTime?: number | null;
   sweptAt?: string;
   sweepPrice?: number;
 }

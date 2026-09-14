@@ -13,17 +13,22 @@ router = APIRouter()
 @router.get("/dashboard/stats")
 def get_dashboard_stats(db: Session = Depends(get_db)):
     """Computes real dashboard statistics from MT5 and persistent DB records."""
-    open_trades = db.query(TradeModel).filter_by(status="OPEN").all()
+    open_trades = []
+    today_closed = []
+    try:
+        open_trades = db.query(TradeModel).filter_by(status="OPEN").all()
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_closed = (
+            db.query(TradeModel)
+            .filter(TradeModel.status == "CLOSED", TradeModel.closed_at >= today_start)
+            .all()
+        )
+    except Exception as e:
+        logger.warning(f"Database error querying dashboard stats: {e}")
+
     open_lots = sum(t.lots for t in open_trades) if open_trades else 0.0
     unrealized_pnl = sum(t.profit for t in open_trades) if open_trades else 0.0
 
-    # Today's realized PnL from closed trades
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    today_closed = (
-        db.query(TradeModel)
-        .filter(TradeModel.status == "CLOSED", TradeModel.closed_at >= today_start)
-        .all()
-    )
     realized_today = sum(t.profit for t in today_closed) if today_closed else 0.0
     winning_today = sum(1 for t in today_closed if t.profit > 0)
     win_rate_today = (winning_today / len(today_closed) * 100) if today_closed else 0.0
@@ -65,15 +70,19 @@ def get_daily_performance(db: Session = Depends(get_db)):
         day_end = day_start + timedelta(days=1)
         day_name = day_date.strftime("%a")
 
-        trades = (
-            db.query(TradeModel)
-            .filter(
-                TradeModel.status == "CLOSED",
-                TradeModel.closed_at >= day_start,
-                TradeModel.closed_at < day_end,
+        trades = []
+        try:
+            trades = (
+                db.query(TradeModel)
+                .filter(
+                    TradeModel.status == "CLOSED",
+                    TradeModel.closed_at >= day_start,
+                    TradeModel.closed_at < day_end,
+                )
+                .all()
             )
-            .all()
-        )
+        except Exception as e:
+            logger.warning(f"Database error querying daily performance for {day_name}: {e}")
 
         pnl = sum(t.profit for t in trades) if trades else 0.0
         daily_records.append({
@@ -101,12 +110,16 @@ def get_equity_curve(db: Session = Depends(get_db)):
     except Exception:
         pass
 
-    closed_trades = (
-        db.query(TradeModel)
-        .filter(TradeModel.status == "CLOSED", TradeModel.closed_at.isnot(None))
-        .order_by(TradeModel.closed_at.asc())
-        .all()
-    )
+    closed_trades = []
+    try:
+        closed_trades = (
+            db.query(TradeModel)
+            .filter(TradeModel.status == "CLOSED", TradeModel.closed_at.isnot(None))
+            .order_by(TradeModel.closed_at.asc())
+            .all()
+        )
+    except Exception as e:
+        logger.warning(f"Database error querying equity curve trades: {e}")
 
     total_profit = sum(t.profit for t in closed_trades) if closed_trades else 0.0
     starting_balance = max(0.0, round(current_balance - total_profit, 2))

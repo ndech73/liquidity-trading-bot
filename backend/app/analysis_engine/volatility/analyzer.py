@@ -161,7 +161,7 @@ class VolatilityAnalyzer:
             return VolatilityRegime.LOW
         return VolatilityRegime.NORMAL
 
-    def analyze(self, candles: Sequence[Candle]) -> List[VolatilityReading]:
+    def analyze(self, candles: Sequence[Candle], latest_only: bool = False) -> List[VolatilityReading]:
         """
         Full pipeline: candles -> true ranges -> ATR series -> a
         VolatilityReading (with regime) for each ATR point.
@@ -178,6 +178,20 @@ class VolatilityAnalyzer:
 
         offset = self.atr_period + 1
         readings: List[VolatilityReading] = []
+
+        if latest_only:
+            i = len(atr_values) - 1
+            candle_index = offset + i - 1
+            tr_index = self.atr_period + i - 1
+            readings.append(
+                VolatilityReading(
+                    timestamp=candles[candle_index].timestamp,
+                    true_range=true_ranges[tr_index],
+                    atr=atr_values[-1],
+                    regime=self.classify_regime(atr_values),
+                )
+            )
+            return readings
 
         for i, atr in enumerate(atr_values):
             candle_index = offset + i - 1

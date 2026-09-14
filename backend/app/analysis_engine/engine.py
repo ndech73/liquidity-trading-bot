@@ -97,11 +97,13 @@ class AnalysisEngine:
             existing_zones or [], self.liquidity_detector.detect(candles)
         )
 
-        zones, sweep_events = self.sweep_detector.detect(zones, candles)
+        volatility_readings = self.volatility_analyzer.analyze(candles, latest_only=True)
+        current_atr = volatility_readings[-1].atr if volatility_readings else None
 
-        volatility_readings = self.volatility_analyzer.analyze(candles)
-        compression_readings = self.compression_detector.analyze(candles)
-        expansion_readings = self.expansion_detector.analyze(candles)
+        zones, sweep_events = self.sweep_detector.detect(zones, candles, current_atr=current_atr)
+
+        compression_readings = self.compression_detector.analyze(candles, latest_only=True)
+        expansion_readings = self.expansion_detector.analyze(candles, latest_only=True)
 
         snapshot = MarketSnapshot(
             symbol=symbol,

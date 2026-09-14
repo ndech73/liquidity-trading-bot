@@ -47,12 +47,10 @@ export const AppLayout: React.FC = () => {
         <Topbar
           botStatus={account?.status || 'OFFLINE'}
           accountBalance={account?.equity ?? 0}
-          isSidebarCollapsed={isCollapsed}
-          onToggleSidebar={handleToggle}
           isWsConnected={isWsConnected}
         />
         <main className="flex-1 overflow-y-auto">
-          <Outlet />
+          <Outlet context={{ isSidebarCollapsed: isCollapsed }} />
         </main>
       </div>
       <MobileNavigation />

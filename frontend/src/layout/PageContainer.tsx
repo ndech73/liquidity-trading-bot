@@ -14,7 +14,7 @@ export const PageContainer: React.FC<PageContainerProps> = ({
   children,
 }) => {
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    <div className="space-y-5 w-full max-w-[99%] 2xl:max-w-[1920px] mx-auto px-3 sm:px-5 lg:px-6 py-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-5">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">{title}</h1>

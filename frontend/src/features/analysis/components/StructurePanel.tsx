@@ -17,7 +17,7 @@ export const StructurePanel: React.FC<{ status: AnalysisStatusData | null }> = (
             </span>
           </div>
           <div className="flex justify-between py-1 border-b border-slate-800">
-            <span className="text-slate-400">Execution Timeframe (M5)</span>
+            <span className="text-slate-400">Execution Timeframe (M15)</span>
             <span className="font-bold text-sky-400">
               {status.executionTimeframeStructure || 'CONSOLIDATING'}
             </span>

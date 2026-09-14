@@ -82,7 +82,7 @@ class CompressionDetector:
         self.contraction_threshold = contraction_threshold
         self._volatility_analyzer = VolatilityAnalyzer()
 
-    def analyze(self, candles: Sequence[Candle]) -> List[CompressionReading]:
+    def analyze(self, candles: Sequence[Candle], latest_only: bool = False) -> List[CompressionReading]:
         """
         Full pipeline: candles -> true ranges -> a CompressionReading for
         every point where both a recent window and a preceding baseline
@@ -94,6 +94,30 @@ class CompressionDetector:
             return []
 
         readings: List[CompressionReading] = []
+
+        if latest_only:
+            i = len(true_ranges) - 1
+            recent_slice = true_ranges[i - self.recent_window + 1 : i + 1]
+            baseline_slice = true_ranges[
+                i - min_required + 1 : i - self.recent_window + 1
+            ]
+
+            recent_avg = mean(recent_slice)
+            baseline_avg = mean(baseline_slice)
+
+            ratio = recent_avg / baseline_avg if baseline_avg else 0.0
+            is_compressed = ratio <= self.contraction_threshold
+
+            readings.append(
+                CompressionReading(
+                    timestamp=candles[i + 1].timestamp,
+                    recent_avg_range=recent_avg,
+                    baseline_avg_range=baseline_avg,
+                    contraction_ratio=ratio,
+                    is_compressed=is_compressed,
+                )
+            )
+            return readings
 
         for i in range(min_required - 1, len(true_ranges)):
             recent_slice = true_ranges[i - self.recent_window + 1 : i + 1]

@@ -109,6 +109,7 @@ def gather_live_state() -> Dict[str, Any]:
     except Exception as e:
         logger.debug(f"[WebSocket] Error querying DB trades: {e}")
     finally:
+        db.rollback()
         db.close()
 
     # 2. Query MT5 if bridge is active

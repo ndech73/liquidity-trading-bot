@@ -1,8 +1,8 @@
 import { apiClient } from '../../../shared/services/apiClient';
 import { LiquidityZone, SweepEvent, AnalysisStatusData } from '../types/analysis.types';
 
-export const getLiquidityZones = async (symbol: string): Promise<LiquidityZone[]> => {
-  const res = await apiClient.get<LiquidityZone[]>('/analysis/zones', { params: { symbol } });
+export const getLiquidityZones = async (symbol: string, timeframe?: string): Promise<LiquidityZone[]> => {
+  const res = await apiClient.get<LiquidityZone[]>('/analysis/zones', { params: { symbol, timeframe } });
   return res.data;
 };
 

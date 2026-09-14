@@ -1,5 +1,6 @@
 import os
 import threading
+from datetime import datetime
 from typing import Optional
 from loguru import logger
 
@@ -189,6 +190,73 @@ class MT5Executor:
             domain_tf = DomainTF(domain_norm)
         except ValueError:
             domain_tf = DomainTF.M5
+
+        candles = []
+        for item in raw_list:
+            t_val, o_val, h_val, l_val, c_val = item[0], item[1], item[2], item[3], item[4]
+            vol_val = float(item[5]) if len(item) > 5 and item[5] is not None else None
+            candles.append(
+                Candle(
+                    symbol=symbol,
+                    timeframe=domain_tf,
+                    timestamp=datetime.fromtimestamp(int(t_val), tz=timezone.utc),
+                    open=float(o_val),
+                    high=float(h_val),
+                    low=float(l_val),
+                    close=float(c_val),
+                    volume=vol_val,
+                )
+            )
+        return candles
+
+    def fetch_candles_range(self, symbol: str, timeframe, date_from: datetime, date_to: datetime):
+        """Fetches historical candles within a specific date range from MT5."""
+        if not self.mt5:
+            raise RuntimeError("MT5 is not connected. Call connect() first.")
+        from datetime import timezone
+        from app.analysis_engine.domain.candle import Candle, Timeframe as DomainTF
+
+        tf_const = self._map_timeframe(timeframe)
+        with MT5Executor._lock:
+            remote_code = f"""
+import MetaTrader5 as mt5
+from datetime import datetime
+_rates = mt5.copy_rates_range('{symbol}', {tf_const}, datetime.fromtimestamp({int(date_from.timestamp())}), datetime.fromtimestamp({int(date_to.timestamp())}))
+"""
+            try:
+                self._conn.execute(remote_code)
+                rates = self._conn.namespace.get("_rates")
+            except Exception:
+                rates = self.mt5.copy_rates_range(symbol, tf_const, date_from, date_to)
+
+            if rates is None or len(rates) == 0:
+                return []
+            try:
+                import rpyc
+                raw_list = rpyc.classic.obtain(rates.tolist())
+            except Exception:
+                raw_list = [
+                    (
+                        int(r["time"]),
+                        float(r["open"]),
+                        float(r["high"]),
+                        float(r["low"]),
+                        float(r["close"]),
+                        float(r["tick_volume"]) if "tick_volume" in r.dtype.names else None,
+                    )
+                    for r in rates
+                ]
+
+        domain_str = str(timeframe.value if hasattr(timeframe, "value") else timeframe).lower()
+        domain_norm = {
+            "m1": "1m", "m5": "5m", "m15": "15m", "m30": "30m",
+            "h1": "1h", "h4": "4h", "d1": "1d", "w1": "1w", "mn": "1mn", "mn1": "1mn"
+        }.get(domain_str, domain_str)
+
+        try:
+            domain_tf = DomainTF(domain_norm)
+        except ValueError:
+            domain_tf = DomainTF.M15
 
         candles = []
         for item in raw_list:
@@ -470,6 +538,55 @@ _close_res = mt5.order_send({{
             else:
                 comment_msg = getattr(res, "comment", "Unknown") if res else "Failed"
                 return {"success": False, "error": comment_msg}
+
+    def modify_position(
+        self,
+        ticket: int,
+        symbol: str,
+        stop_loss: float,
+        take_profit: float = 0.0,
+    ) -> dict:
+        """Modifies Stop Loss and/or Take Profit on an open position."""
+        if not self.mt5:
+            raise RuntimeError("MT5 is not connected. Call connect() first.")
+
+        with MT5Executor._lock:
+            sym_info = self.mt5.symbol_info(symbol)
+            digits = int(getattr(sym_info, "digits", 5)) if sym_info else 5
+            sl = round(float(stop_loss), digits) if stop_loss > 0 else 0.0
+            tp = round(float(take_profit), digits) if take_profit > 0 else 0.0
+
+            remote_code = f"""
+import MetaTrader5 as mt5
+_mod_res = mt5.order_send({{
+    'action': mt5.TRADE_ACTION_SLTP,
+    'position': {int(ticket)},
+    'symbol': '{symbol}',
+    'sl': {sl},
+    'tp': {tp},
+}})
+"""
+            try:
+                self._conn.execute(remote_code)
+                res = self._conn.namespace.get("_mod_res")
+            except Exception:
+                req = {
+                    "action": getattr(self.mt5, "TRADE_ACTION_SLTP", 6),
+                    "position": int(ticket),
+                    "symbol": symbol,
+                    "sl": sl,
+                    "tp": tp,
+                }
+                res = self.mt5.order_send(req)
+
+            if res and getattr(res, "retcode", 0) in [10008, 10009]:
+                logger.success(f"Position {ticket} ({symbol}) modified: SL={sl}, TP={tp}")
+                return {"success": True, "ticket": ticket, "sl": sl, "tp": tp}
+            else:
+                comment_msg = getattr(res, "comment", "Unknown") if res else "Failed"
+                retcode = getattr(res, "retcode", -1) if res else -1
+                logger.warning(f"Failed to modify position {ticket} ({symbol}): {retcode} - {comment_msg}")
+                return {"success": False, "error": comment_msg, "retcode": retcode}
 
     def close(self):
         """No-op for pooled connection to prevent dropping active RPC sessions."""
