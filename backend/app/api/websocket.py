@@ -6,16 +6,14 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from loguru import logger
 from sqlalchemy.orm import Session
 
+from app.core.settings import PRODUCTION_WATCHLIST
 from app.db.session import SessionLocal
 from app.db.models.trade import TradeModel
 from app.execution.mt5_executor import MT5Executor
 
 router = APIRouter()
 
-WATCHLIST = [
-    "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD",
-    "USDCHF", "NZDUSD", "EURJPY", "GBPJPY", "EURGBP",
-]
+WATCHLIST = PRODUCTION_WATCHLIST
 
 
 class ConnectionManager:

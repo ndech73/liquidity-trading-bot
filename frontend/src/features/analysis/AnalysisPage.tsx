@@ -10,11 +10,12 @@ import { Spinner } from '../../shared/components/Spinner';
 import { ErrorState } from '../../shared/components/ErrorState';
 import { MarketChart } from '../markets/components/MarketChart';
 import { ScanSearch, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { CHOSEN_WATCHLIST, DEFAULT_SYMBOL } from '../../config/markets';
 
-const SYMBOLS = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURJPY', 'GBPJPY', 'EURGBP'];
+const SYMBOLS: readonly string[] = CHOSEN_WATCHLIST;
 
 export const AnalysisPage: React.FC = () => {
-  const [symbol, setSymbol] = useState('EURUSD');
+  const [symbol, setSymbol] = useState<string>(DEFAULT_SYMBOL);
   const [showPairsList, setShowPairsList] = useState(false);
   const { zones, sweeps, status, isLoading, error, refetch } = useAnalysis(symbol);
 

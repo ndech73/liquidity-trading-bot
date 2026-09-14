@@ -22,7 +22,7 @@ TF_MAP = {
 
 @router.get("/analysis/zones")
 def get_zones(
-    symbol: str = Query("EURUSD"),
+    symbol: str = Query("EURJPY"),
     timeframe: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
@@ -114,7 +114,7 @@ def get_zones(
 
 @router.get("/analysis/sweeps")
 def get_sweeps(
-    symbol: str = Query("EURUSD"),
+    symbol: str = Query("EURJPY"),
     timeframe: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
@@ -188,7 +188,7 @@ def get_analysis_overview(db: Session = Depends(get_db)):
 
 
 @router.get("/analysis/status")
-def get_analysis_status(symbol: str = Query("EURUSD"), db: Session = Depends(get_db)):
+def get_analysis_status(symbol: str = Query("EURJPY"), db: Session = Depends(get_db)):
     """Returns market structure, compression, expansion and regime state for a symbol across M15 and H1."""
     from app.db.models.snapshot import MarketSnapshotModel
     from app.execution.mt5_executor import MT5Executor

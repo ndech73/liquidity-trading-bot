@@ -1,12 +1,10 @@
 from fastapi import APIRouter, Query
+from app.core.settings import PRODUCTION_WATCHLIST
 from app.execution.mt5_executor import MT5Executor
 
 router = APIRouter()
 
-WATCHLIST = [
-    "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD",
-    "USDCHF", "NZDUSD", "EURJPY", "GBPJPY", "EURGBP",
-]
+WATCHLIST = PRODUCTION_WATCHLIST
 
 
 @router.get("/markets")

@@ -27,6 +27,7 @@ from app.analysis_engine.engine import AnalysisEngine, MarketSnapshot
 from app.analysis_engine.liquidity.sweep_detector import SweepDetector
 from app.core.settings import get_settings
 from app.db.models.event import LiquiditySweepEventModel
+from app.core.settings import PRODUCTION_WATCHLIST
 from app.db.models.snapshot import MarketSnapshotModel
 from app.db.models.trade import TradeModel
 from app.db.models.zone import LiquidityZoneModel
@@ -37,9 +38,7 @@ from app.strategy.entry_engine import EntryEngine, EntrySignal, TradeDirection
 from app.strategy.exit_engine import ExitEngine
 
 
-WATCHLIST = [
-    "EURJPY", "USDCHF", "NZDUSD", "USDCAD", "EURGBP",
-]
+WATCHLIST = PRODUCTION_WATCHLIST
 
 
 class TradingRunner:
