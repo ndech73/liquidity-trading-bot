@@ -20,12 +20,12 @@ class AnalysisEngineSettings(BaseModel):
     allow_ranging_trend: bool = True
     require_expansion: bool = False
     require_htf_alignment: bool = True
-    max_stop_loss_pips: float | None = 18.0
+    max_stop_loss_pips: float | None = 22.0
     min_penetration_ticks: int = 0
     min_penetration_atr_ratio: float = 0.10
     min_penetration_pips_floor: float = 0.8
     require_stay_beyond: bool = False
-    min_rejection_wick_pct: float = 0.40
+    min_rejection_wick_pct: float = 0.35
     rejection_close_range_pct: float = 0.50
     min_volume_multiplier: float = 0.0
     volume_ma_period: int = 20
