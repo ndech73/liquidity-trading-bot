@@ -64,7 +64,7 @@ class TradingRunner:
         exit_engine: ExitEngine | None = None,
         poll_interval_seconds: float = 10.0,
         htf_alignment_symbols: list[str] | None = None,
-        max_stop_loss_pips: float = 35.0,
+        max_stop_loss_pips: float = 18.0,
     ) -> None:
         self.watchlist = watchlist or list(WATCHLIST)
         self.htf_alignment_symbols = [s.upper() for s in htf_alignment_symbols] if htf_alignment_symbols is not None else None

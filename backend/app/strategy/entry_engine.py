@@ -252,7 +252,7 @@ class EntryEngine:
         self.max_stop_loss_pips = (
             max_stop_loss_pips
             if max_stop_loss_pips is not None
-            else getattr(settings, "max_stop_loss_pips", None)
+            else getattr(settings, "max_stop_loss_pips", 18.0)
         )
 
         if self.rejection_confirmation_candles < 0:
@@ -313,13 +313,13 @@ class EntryEngine:
             # If H1 structure is RANGING, H1 alignment is relaxed/skipped.
             if require_htf_alignment is False:
                 enforce_htf = False
-            elif require_htf_alignment is True and (not htf_candles or len(htf_candles) < 10):
+            elif require_htf_alignment is True:
                 enforce_htf = True
             elif self.htf_alignment_symbols is not None:
                 symbol_in_list = event.symbol.upper() in self.htf_alignment_symbols
                 enforce_htf = self.require_htf_alignment and symbol_in_list
             else:
-                enforce_htf = self.is_htf_alignment_required(htf_candles)
+                enforce_htf = self.require_htf_alignment
 
             if enforce_htf and htf_trend is not None:
                 if not self._htf_alignment_allows(direction, htf_trend, htf_snapshot):

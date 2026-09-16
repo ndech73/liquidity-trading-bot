@@ -14,13 +14,13 @@ class AnalysisEngineSettings(BaseModel):
     expansion_threshold: float = 1.5
     direction_threshold: float = 0.3
     # Strategy & Rejection confirmation thresholds
-    require_rejection_confirmation: bool = False
+    require_rejection_confirmation: bool = True
     rejection_confirmation_candles: int = 3
     stop_buffer_pct: float = 0.0005
     allow_ranging_trend: bool = True
     require_expansion: bool = False
     require_htf_alignment: bool = True
-    max_stop_loss_pips: float | None = None
+    max_stop_loss_pips: float | None = 18.0
     min_penetration_ticks: int = 0
     min_penetration_atr_ratio: float = 0.10
     min_penetration_pips_floor: float = 0.8
