@@ -47,7 +47,7 @@ class TradingRunner:
         watchlist: list[str] | None = None,
         timeframe: Timeframe = Timeframe.M15,
         htf_timeframe: Timeframe = Timeframe.H1,
-        candle_count: int = 120,
+        candle_count: int = 250,
         positions_per_trade: int = 2,
         max_signal_age_candles: int = 2,
         breakeven_pips: float | None = None,
@@ -128,6 +128,7 @@ class TradingRunner:
                 min_penetration_ticks=0,
                 min_hold_candles=0,
                 min_hold_seconds=0.0,
+                min_penetration_pips_floor=getattr(settings, "min_penetration_pips_floor", 0.8) if settings else 0.8,
             )
         )
         self.poll_interval_seconds = poll_interval_seconds

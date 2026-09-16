@@ -61,7 +61,7 @@ class SweepDetector:
         if self.min_penetration_atr_ratio is None:
             self.min_penetration_atr_ratio = 0.10
         if self.min_penetration_pips_floor is None:
-            self.min_penetration_pips_floor = 2.0
+            self.min_penetration_pips_floor = 0.8
 
     @staticmethod
     def _compute_atr_from_candles(candles: Sequence[Candle], period: int = 14) -> float:

@@ -197,12 +197,12 @@ class EntryEngine:
         self.min_rejection_wick_pct = (
             min_rejection_wick_pct
             if min_rejection_wick_pct is not None
-            else getattr(settings, "min_rejection_wick_pct", 0.50)
+            else getattr(settings, "min_rejection_wick_pct", 0.40)
         )
         self.rejection_close_range_pct = (
             rejection_close_range_pct
             if rejection_close_range_pct is not None
-            else getattr(settings, "rejection_close_range_pct", 0.35)
+            else getattr(settings, "rejection_close_range_pct", 0.40)
         )
         self.min_volume_multiplier = (
             min_volume_multiplier
