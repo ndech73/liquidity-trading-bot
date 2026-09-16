@@ -202,12 +202,12 @@ class EntryEngine:
         self.rejection_close_range_pct = (
             rejection_close_range_pct
             if rejection_close_range_pct is not None
-            else getattr(settings, "rejection_close_range_pct", 0.40)
+            else getattr(settings, "rejection_close_range_pct", 0.50)
         )
         self.min_volume_multiplier = (
             min_volume_multiplier
             if min_volume_multiplier is not None
-            else getattr(settings, "min_volume_multiplier", 1.2)
+            else getattr(settings, "min_volume_multiplier", 0.0)
         )
         self.volume_ma_period = (
             volume_ma_period

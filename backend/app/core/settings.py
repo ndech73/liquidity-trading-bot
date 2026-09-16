@@ -26,8 +26,8 @@ class AnalysisEngineSettings(BaseModel):
     min_penetration_pips_floor: float = 0.8
     require_stay_beyond: bool = False
     min_rejection_wick_pct: float = 0.40
-    rejection_close_range_pct: float = 0.40
-    min_volume_multiplier: float = 1.2
+    rejection_close_range_pct: float = 0.50
+    min_volume_multiplier: float = 0.0
     volume_ma_period: int = 20
     require_trend_alignment: bool = True
     require_recent_compression: bool = False

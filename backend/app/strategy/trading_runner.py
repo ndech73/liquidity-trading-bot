@@ -115,6 +115,8 @@ class TradingRunner:
             require_trend_alignment=True,
             min_penetration_ticks=0,
             require_stay_beyond=False,
+            min_volume_multiplier=0.0,
+            rejection_close_range_pct=0.50,
             max_stop_loss_pips=max_stop_loss_pips,
         )
         self.exit_engine = exit_engine or ExitEngine(
