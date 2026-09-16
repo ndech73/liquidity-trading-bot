@@ -11,7 +11,9 @@
       "USDCHF",
       "NZDUSD",
       "USDCAD",
-      "EURGBP"
+      "EURGBP",
+      "GBPUSD",
+      "EURUSD"
     ],
     "default_lot_size": 0.05,
     "max_stop_loss_cap_pips": 35.0,
@@ -179,7 +181,7 @@
         {
           "step_id": "5.2",
           "name": "Watchlist Whitelist Validation",
-          "action": "Confirms symbol belongs to the approved 5-pair production basket (EURJPY, USDCHF, NZDUSD, USDCAD, EURGBP)."
+          "action": "Confirms symbol belongs to the approved 7-pair production basket (EURJPY, USDCHF, NZDUSD, USDCAD, EURGBP, GBPUSD, EURUSD)."
         },
         {
           "step_id": "5.3",

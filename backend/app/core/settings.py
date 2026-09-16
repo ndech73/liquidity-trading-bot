@@ -45,13 +45,15 @@ class AnalysisEngineSettings(BaseModel):
 
 AnalysisSettings = AnalysisEngineSettings
 
-# Approved 5 High-Alpha Production Trading Basket
+# Approved 7 High-Alpha Production Trading Basket
 PRODUCTION_WATCHLIST: list[str] = [
     "EURJPY",
     "USDCHF",
     "NZDUSD",
     "USDCAD",
     "EURGBP",
+    "GBPUSD",
+    "EURUSD",
 ]
 
 
