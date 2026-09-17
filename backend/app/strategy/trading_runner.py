@@ -36,6 +36,7 @@ from app.execution.mt5_executor import MT5Executor
 from app.risk.risk_engine import RiskEngine
 from app.strategy.entry_engine import EntryEngine, EntrySignal, TradeDirection
 from app.strategy.exit_engine import ExitEngine
+from app.strategy.news_filter import NewsFilter
 
 
 WATCHLIST = PRODUCTION_WATCHLIST
@@ -65,6 +66,8 @@ class TradingRunner:
         poll_interval_seconds: float = 10.0,
         htf_alignment_symbols: list[str] | None = None,
         max_stop_loss_pips: float = 22.0,
+        enable_news_filter: bool = True,
+        news_filter: NewsFilter | None = None,
     ) -> None:
         self.watchlist = watchlist or list(WATCHLIST)
         self.htf_alignment_symbols = [s.upper() for s in htf_alignment_symbols] if htf_alignment_symbols is not None else None
@@ -97,6 +100,12 @@ class TradingRunner:
         self.enable_session_filter = enable_session_filter
         self.session_start_hour_utc = session_start_hour_utc
         self.session_end_hour_utc = session_end_hour_utc
+        self.enable_news_filter = (
+            enable_news_filter
+            if enable_news_filter is not None
+            else (getattr(settings, "enable_news_filter", True) if settings else True)
+        )
+        self.news_filter = news_filter or (NewsFilter() if self.enable_news_filter else None)
         self.max_stop_loss_pips = max_stop_loss_pips
         self.risk_engine = risk_engine or RiskEngine(
             default_lot_size=0.05,
@@ -403,9 +412,21 @@ class TradingRunner:
             return
 
         # Session / Killzone Filter: Avoid Asian and rollover low-volume dead zones (21:00 - 06:45 UTC)
+        now_utc = datetime.now(timezone.utc)
         if self.enable_session_filter:
-            now_utc = datetime.now(timezone.utc)
             if now_utc.hour < self.session_start_hour_utc or now_utc.hour >= self.session_end_hour_utc:
+                return
+
+        # High-Impact Macroeconomic News & Volatility Spike Filter
+        if self.enable_news_filter and self.news_filter:
+            is_news, news_desc = self.news_filter.is_news_time(
+                symbol=symbol,
+                timestamp=now_utc,
+                current_candle=candles_m15[-1] if candles_m15 else None,
+                history=candles_m15,
+            )
+            if is_news:
+                logger.warning(f"[TradingRunner] Entry blocked on {symbol} due to {news_desc}.")
                 return
 
         # 5. Generate entry signals with Multi-Timeframe Confluence (live structure classification against H1)

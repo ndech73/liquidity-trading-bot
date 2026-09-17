@@ -41,6 +41,8 @@ class AnalysisEngineSettings(BaseModel):
     enable_session_filter: bool = True
     session_start_hour_utc: int = 7
     session_end_hour_utc: int = 18
+    # High-Impact Macroeconomic News & Volatility Filter
+    enable_news_filter: bool = True
 
 
 AnalysisSettings = AnalysisEngineSettings
