@@ -29,7 +29,7 @@ class AnalysisEngineSettings(BaseModel):
     rejection_close_range_pct: float = 0.50
     min_volume_multiplier: float = 0.0
     volume_ma_period: int = 20
-    require_trend_alignment: bool = True
+    require_trend_alignment: bool = False
     require_recent_compression: bool = False
     compression_lookback_candles: int = 6
     # Early Break-Even configuration

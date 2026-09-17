@@ -112,7 +112,7 @@ class TradingRunner:
             require_rejection_confirmation=True,
             require_expansion=False,
             require_htf_alignment=True,
-            require_trend_alignment=True,
+            require_trend_alignment=False,
             min_penetration_ticks=0,
             require_stay_beyond=False,
             min_volume_multiplier=0.0,
@@ -389,14 +389,12 @@ class TradingRunner:
         # 2. Run Analysis for H1 (Higher Timeframe)
         snapshot_h1 = None
         if candles_h1 and len(candles_h1) >= 20:
-            existing_h1 = self.get_tracked_zones(symbol, h1_tf_str)
-            snapshot_h1 = self.analysis_engine.analyze(candles_h1, existing_zones=existing_h1)
+            snapshot_h1 = self.analysis_engine.analyze(candles_h1, existing_zones=None)
             self.set_tracked_zones(symbol, h1_tf_str, snapshot_h1.zones)
             self._persist_analysis(symbol, candles_h1, snapshot_h1, timeframe_str=h1_tf_str)
 
         # 3. Run Analysis for M15 (Primary / Execution Timeframe)
-        existing_m15 = self.get_tracked_zones(symbol, m15_tf_str)
-        snapshot_m15 = self.analysis_engine.analyze(candles_m15, existing_zones=existing_m15)
+        snapshot_m15 = self.analysis_engine.analyze(candles_m15, existing_zones=None)
         self.set_tracked_zones(symbol, m15_tf_str, snapshot_m15.zones)
         self._persist_analysis(symbol, candles_m15, snapshot_m15, timeframe_str=m15_tf_str)
 
