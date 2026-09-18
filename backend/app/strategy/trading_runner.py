@@ -86,12 +86,12 @@ class TradingRunner:
         self.breakeven_pips = (
             breakeven_pips
             if breakeven_pips is not None
-            else (getattr(settings, "early_breakeven_trigger_pips", 15.0) if settings else 15.0)
+            else (getattr(settings, "early_breakeven_trigger_pips", 8.0) if settings else 8.0)
         )
         self.breakeven_buffer_pips = (
             breakeven_buffer_pips
             if breakeven_buffer_pips is not None
-            else (getattr(settings, "early_breakeven_buffer_pips", 3.0) if settings else 3.0)
+            else (getattr(settings, "early_breakeven_buffer_pips", 1.0) if settings else 1.0)
         )
         self.tp1_rr = tp1_rr
         self.tp2_rr = tp2_rr
@@ -281,61 +281,10 @@ class TradingRunner:
             mt5_tickets = {p["ticket"]: p for p in open_positions}
 
             db_open_trades = db.query(TradeModel).filter_by(status="OPEN").all()
+
+            # 1. Process closed positions first so DB status and exit_type are up to date
             for trade in db_open_trades:
-                if trade.ticket in mt5_tickets:
-                    # Trade is still active on MT5 - update unrealized profit and current price
-                    pos = mt5_tickets[trade.ticket]
-                    trade.profit = pos.get("profit", trade.profit)
-                    current_p = pos.get("price_current", trade.close_price)
-                    trade.close_price = current_p
-
-                    # Early Break-Even Protection Check
-                    if self.breakeven_pips > 0 and trade.open_price:
-                        is_buy = (trade.order_type or "").upper() == "BUY"
-                        entry_p = float(trade.open_price)
-                        pip_size = 0.01 if "JPY" in trade.symbol.upper() else 0.0001
-                        should_be = self.exit_engine.should_trigger_breakeven(
-                            direction=trade.order_type,
-                            entry_price=entry_p,
-                            current_price=current_p,
-                            pip_size=pip_size,
-                            trigger_pips=self.breakeven_pips,
-                        )
-                        if should_be:
-                            be_price = self.exit_engine.compute_breakeven_sl(
-                                direction=trade.order_type,
-                                entry_price=entry_p,
-                                pip_size=pip_size,
-                                buffer_pips=self.breakeven_buffer_pips,
-                            )
-                            current_sl = float(pos.get("sl") or trade.stop_loss or 0.0)
-                            current_tp = float(pos.get("tp") or trade.take_profit or 0.0)
-
-                            sl_needs_update = False
-                            if is_buy:
-                                if current_sl < be_price:
-                                    sl_needs_update = True
-                            else:
-                                if current_sl <= 0.0 or current_sl > be_price:
-                                    sl_needs_update = True
-
-                            if sl_needs_update:
-                                pips_in_profit = (current_p - entry_p) / pip_size if is_buy else (entry_p - current_p) / pip_size
-                                logger.info(
-                                    f"[TradingRunner] Position {trade.ticket} ({trade.symbol}) reached +{pips_in_profit:.1f} pips profit. "
-                                    f"Moving Stop Loss to Break-Even ({be_price:.5f})."
-                                )
-                                mod_res = self.executor.modify_position(
-                                    ticket=trade.ticket,
-                                    symbol=trade.symbol,
-                                    stop_loss=be_price,
-                                    take_profit=current_tp,
-                                )
-                                if mod_res.get("success"):
-                                    trade.stop_loss = be_price
-                                    logger.success(f"[TradingRunner] Position {trade.ticket} protected at Break-Even ({be_price:.5f})!")
-                else:
-                    # Trade was closed on MT5!
+                if trade.ticket not in mt5_tickets:
                     deals = self.executor.get_position_deals(trade.ticket)
                     exit_deal = None
                     for d in deals:
@@ -347,7 +296,9 @@ class TradingRunner:
                     trade.closed_at = datetime.now(timezone.utc)
                     if exit_deal:
                         trade.close_price = exit_deal.get("price", trade.close_price or trade.open_price)
-                        trade.profit = round(exit_deal.get("profit", 0.0) + exit_deal.get("swap", 0.0) + exit_deal.get("commission", 0.0), 2)
+                        trade.profit = round(
+                            exit_deal.get("profit", 0.0) + exit_deal.get("swap", 0.0) + exit_deal.get("commission", 0.0), 2
+                        )
 
                     # Classify and record exit_type on TradeModel
                     close_p = trade.close_price if trade.close_price is not None else trade.open_price
@@ -369,6 +320,122 @@ class TradingRunner:
                     logger.success(
                         f"[TradingRunner] Position {trade.ticket} ({trade.symbol}) closed [{trade.exit_type}]. Final profit: ${trade.profit:.2f}"
                     )
+            db.commit()
+
+            # 2. Process active positions: update unrealized PnL and execute dynamic Break-Even protection
+            for trade in db_open_trades:
+                if trade.ticket in mt5_tickets:
+                    pos = mt5_tickets[trade.ticket]
+                    trade.profit = pos.get("profit", trade.profit)
+                    current_p = pos.get("price_current", trade.close_price)
+                    trade.close_price = current_p
+
+                    # Early & Dynamic Break-Even Protection Check
+                    if trade.open_price:
+                        is_buy = (trade.order_type or "").upper() == "BUY"
+                        entry_p = float(trade.open_price)
+                        pip_size = 0.01 if "JPY" in trade.symbol.upper() else 0.0001
+
+                        # Calculate initial risk pips if stop loss was set
+                        risk_pips = None
+                        if trade.stop_loss and float(trade.stop_loss) > 0:
+                            risk_pips = abs(entry_p - float(trade.stop_loss)) / pip_size
+
+                        # Check if a sibling position (same setup) has already taken profit (TP1/TP2)
+                        sibling_hit_tp = False
+                        sibling_trades = (
+                            db.query(TradeModel)
+                            .filter(
+                                TradeModel.id != trade.id,
+                                TradeModel.symbol == trade.symbol,
+                                TradeModel.order_type == trade.order_type,
+                            )
+                            .all()
+                        )
+                        for sib in sibling_trades:
+                            if trade.opened_at and sib.opened_at:
+                                time_diff = abs((trade.opened_at - sib.opened_at).total_seconds())
+                                if time_diff <= 600:  # Same setup cluster
+                                    if sib.status == "CLOSED":
+                                        if sib.exit_type in ("TP1", "TP2") or sib.profit > 0:
+                                            sibling_hit_tp = True
+                                            break
+
+                        # Dynamic 1.0 RR or threshold profit check
+                        should_be_from_profit = False
+                        if self.breakeven_pips > 0:
+                            should_be_from_profit = self.exit_engine.should_trigger_breakeven(
+                                direction=trade.order_type,
+                                entry_price=entry_p,
+                                current_price=current_p,
+                                pip_size=pip_size,
+                                trigger_pips=self.breakeven_pips,
+                                risk_pips=risk_pips,
+                                rr_trigger=1.0,
+                            )
+
+                        should_be = sibling_hit_tp or should_be_from_profit
+
+                        if should_be:
+                            target_be_sl = self.exit_engine.compute_breakeven_sl(
+                                direction=trade.order_type,
+                                entry_price=entry_p,
+                                pip_size=pip_size,
+                                buffer_pips=self.breakeven_buffer_pips,
+                            )
+                            current_sl = float(pos.get("sl") or trade.stop_loss or 0.0)
+                            current_tp = float(pos.get("tp") or trade.take_profit or 0.0)
+
+                            # Determine safe SL allowed by MT5 (SL must be below price for BUY, above for SELL)
+                            actual_be_sl = None
+                            if is_buy:
+                                if current_p > target_be_sl:
+                                    actual_be_sl = target_be_sl
+                                elif current_p > entry_p:
+                                    actual_be_sl = round(entry_p, 5)
+                            else:
+                                if current_p < target_be_sl:
+                                    actual_be_sl = target_be_sl
+                                elif current_p < entry_p:
+                                    actual_be_sl = round(entry_p, 5)
+
+                            sl_needs_update = False
+                            if actual_be_sl is not None:
+                                if is_buy and current_sl < actual_be_sl:
+                                    sl_needs_update = True
+                                elif not is_buy and (current_sl <= 0.0 or current_sl > actual_be_sl):
+                                    sl_needs_update = True
+
+                            if sl_needs_update and actual_be_sl is not None:
+                                pips_in_profit = (current_p - entry_p) / pip_size if is_buy else (entry_p - current_p) / pip_size
+                                trigger_reason = "sibling TP1 secured" if sibling_hit_tp else f"+{pips_in_profit:.1f} pips reached (1.0 RR)"
+                                logger.info(
+                                    f"[TradingRunner] Position {trade.ticket} ({trade.symbol}) BE triggered ({trigger_reason}). "
+                                    f"Moving Stop Loss to Break-Even ({actual_be_sl:.5f})."
+                                )
+                                mod_res = self.executor.modify_position(
+                                    ticket=trade.ticket,
+                                    symbol=trade.symbol,
+                                    stop_loss=actual_be_sl,
+                                    take_profit=current_tp,
+                                )
+                                if mod_res.get("success"):
+                                    trade.stop_loss = actual_be_sl
+                                    logger.success(f"[TradingRunner] Position {trade.ticket} protected at Break-Even ({actual_be_sl:.5f})!")
+                            elif sibling_hit_tp and actual_be_sl is None:
+                                # Sibling P1 took profit, but price retraced back to or past entry price!
+                                is_past_entry = (current_p <= entry_p) if is_buy else (current_p >= entry_p)
+                                if is_past_entry:
+                                    logger.warning(
+                                        f"[TradingRunner] Position {trade.ticket} ({trade.symbol}) runner retraced to entry "
+                                        f"after sibling took profit. Closing at market to eliminate loss."
+                                    )
+                                    self.executor.close_position(
+                                        ticket=trade.ticket,
+                                        symbol=trade.symbol,
+                                        volume=trade.lots,
+                                        order_type=trade.order_type,
+                                    )
             db.commit()
         except Exception as e:
             logger.warning(f"[TradingRunner] Error during position sync: {e}")

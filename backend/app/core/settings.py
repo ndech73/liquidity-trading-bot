@@ -33,8 +33,8 @@ class AnalysisEngineSettings(BaseModel):
     require_recent_compression: bool = False
     compression_lookback_candles: int = 6
     # Early Break-Even configuration
-    early_breakeven_trigger_pips: float = 15.0
-    early_breakeven_buffer_pips: float = 3.0
+    early_breakeven_trigger_pips: float = 8.0
+    early_breakeven_buffer_pips: float = 1.0
     # Structure classification
     structure_lookback_swings: int = 6
     # Session / Killzone Filter (UTC hours)

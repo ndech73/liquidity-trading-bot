@@ -80,12 +80,12 @@ class ExitEngine:
         self.early_breakeven_trigger_pips = (
             early_breakeven_trigger_pips
             if early_breakeven_trigger_pips is not None
-            else (getattr(settings, "early_breakeven_trigger_pips", 15.0) if settings else 15.0)
+            else (getattr(settings, "early_breakeven_trigger_pips", 8.0) if settings else 8.0)
         )
         self.early_breakeven_buffer_pips = (
             early_breakeven_buffer_pips
             if early_breakeven_buffer_pips is not None
-            else (getattr(settings, "early_breakeven_buffer_pips", 3.0) if settings else 3.0)
+            else (getattr(settings, "early_breakeven_buffer_pips", 1.0) if settings else 1.0)
         )
 
     def compute_exit_levels(
@@ -180,17 +180,26 @@ class ExitEngine:
         current_price: float,
         pip_size: float,
         trigger_pips: float | None = None,
+        risk_pips: float | None = None,
+        rr_trigger: float = 1.0,
     ) -> bool:
         """
         Checks whether unrealized profit meets or exceeds the break-even trigger threshold.
+        Supports both fixed pip trigger and dynamic risk-reward multiple trigger (e.g. 1.0 RR).
         """
-        trig = trigger_pips if trigger_pips is not None else self.early_breakeven_trigger_pips
         dir_str = direction.value.upper() if isinstance(direction, TradeDirection) else str(direction).upper()
         if dir_str == "BUY":
             profit_pips = (current_price - entry_price) / pip_size
         else:
             profit_pips = (entry_price - current_price) / pip_size
-        return profit_pips >= trig - 1e-9
+
+        base_trigger = trigger_pips if trigger_pips is not None else self.early_breakeven_trigger_pips
+        if risk_pips is not None and risk_pips > 0:
+            effective_trigger = min(base_trigger, max(2.0, risk_pips * rr_trigger))
+        else:
+            effective_trigger = base_trigger
+
+        return profit_pips >= effective_trigger - 1e-9
 
     def determine_exit_type(
         self,
