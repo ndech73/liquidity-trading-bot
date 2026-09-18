@@ -19,9 +19,9 @@ class RiskEngine:
         max_open_trades: int = 10,
         max_trades_per_symbol: int = 2,
         risk_per_trade_pct: float = 0.01,
-        min_lot_size: float = 0.05,
+        min_lot_size: float = 0.01,
         max_lot_size: float = 1.0,
-        default_lot_size: float = 0.05,
+        default_lot_size: float = 0.01,
         max_setup_risk_usd: float | None = None,
         positions_per_trade: int = 2,
     ) -> None:
@@ -42,7 +42,7 @@ class RiskEngine:
         self.max_setup_risk_usd = (
             max_setup_risk_usd
             if max_setup_risk_usd is not None
-            else (getattr(settings, "max_setup_risk_usd", 9.50) if settings else 9.50)
+            else (getattr(settings, "max_setup_risk_usd", 3.50) if settings else 3.50)
         )
 
     @staticmethod
@@ -104,18 +104,20 @@ class RiskEngine:
                 reason="Invalid stop loss: distance to entry is zero",
             )
 
-        # 5. Position Sizing & Hard Setup Dollar Risk Cap
+        # 5. Dynamic Position Sizing & Hard Setup Dollar Risk Cap
         is_jpy = "JPY" in symbol.upper()
         pip_size = 0.01 if is_jpy else 0.0001
         pips_at_risk = sl_dist / pip_size
         pip_value_usd = self.estimate_pip_value_usd(symbol)
 
-        computed_lot = self.default_lot_size
-        if balance > 50.0:
-            risk_capital = balance * self.risk_per_trade_pct
-            if pips_at_risk > 0:
-                raw_lots = risk_capital / (pips_at_risk * pip_value_usd)
-                computed_lot = max(self.min_lot_size, min(round(raw_lots, 2), self.max_lot_size))
+        # Dynamic lot sizing: calculate lot size per position such that total setup risk <= max_setup_risk_usd
+        if self.max_setup_risk_usd and self.max_setup_risk_usd > 0 and pips_at_risk > 0 and pip_value_usd > 0:
+            target_risk = self.max_setup_risk_usd
+            if balance > 50.0:
+                target_risk = min(self.max_setup_risk_usd, balance * self.risk_per_trade_pct * self.positions_per_trade)
+            ideal_lot = target_risk / (pips_at_risk * pip_value_usd * self.positions_per_trade)
+            # Floor to 2 decimal places so we never round up and exceed risk
+            computed_lot = max(self.min_lot_size, min(float(int(ideal_lot * 100) / 100.0), self.max_lot_size))
         else:
             computed_lot = self.default_lot_size
 
@@ -124,7 +126,7 @@ class RiskEngine:
 
         # Hard dollar risk guard across all setup positions
         if self.max_setup_risk_usd and self.max_setup_risk_usd > 0:
-            if total_setup_risk > self.max_setup_risk_usd:
+            if total_setup_risk > self.max_setup_risk_usd + 0.05:
                 return RiskAssessment(
                     approved=False,
                     reason=(

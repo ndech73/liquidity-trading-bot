@@ -112,11 +112,11 @@ class TradingRunner:
             else (getattr(settings, "max_stop_loss_pips", 10.0) if settings else 10.0)
         )
         self.risk_engine = risk_engine or RiskEngine(
-            default_lot_size=0.05,
-            min_lot_size=0.05,
+            default_lot_size=0.01,
+            min_lot_size=0.01,
             max_open_trades=10,
             max_trades_per_symbol=2,
-            max_setup_risk_usd=getattr(settings, "max_setup_risk_usd", 9.50) if settings else 9.50,
+            max_setup_risk_usd=getattr(settings, "max_setup_risk_usd", 3.50) if settings else 3.50,
             positions_per_trade=self.positions_per_trade,
         )
         self.entry_engine = entry_engine or EntryEngine(

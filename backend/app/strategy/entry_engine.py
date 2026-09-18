@@ -434,7 +434,14 @@ class EntryEngine:
           Trade is BLOCKED unless HTF itself recently swept opposing liquidity
           (e.g., H1 swept SELLSIDE liquidity -> macro discount reversal point).
         """
-        if self._trend_allows(direction, htf_trend):
+        # Strict H1 Higher Timeframe trend alignment
+        if direction == TradeDirection.BUY and htf_trend == MarketStructureTrend.BULLISH:
+            return True
+        if direction == TradeDirection.SELL and htf_trend == MarketStructureTrend.BEARISH:
+            return True
+
+        # Ranging HTF market permits sweeps of range edges
+        if htf_trend == MarketStructureTrend.RANGING and self.allow_ranging_trend:
             return True
 
         if htf_snapshot and htf_snapshot.sweep_events:

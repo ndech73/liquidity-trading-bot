@@ -21,7 +21,7 @@ class AnalysisEngineSettings(BaseModel):
     require_expansion: bool = False
     require_htf_alignment: bool = True
     max_stop_loss_pips: float | None = 10.0
-    max_setup_risk_usd: float = 9.50
+    max_setup_risk_usd: float = 3.50
     min_penetration_ticks: int = 0
     min_penetration_atr_ratio: float = 0.10
     min_penetration_pips_floor: float = 0.8
