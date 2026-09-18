@@ -41,10 +41,23 @@ class NewsFilter:
         enable_scheduled_filter: bool = True,
         enable_volatility_spike_filter: bool = True,
         volatility_spike_multiplier: float = 2.5,
+        post_news_cooldown_minutes: int | None = None,
     ):
+        settings = None
+        try:
+            from app.core.settings import get_settings
+            settings = get_settings().analysis
+        except Exception:
+            pass
+
         self.enable_scheduled_filter = enable_scheduled_filter
         self.enable_volatility_spike_filter = enable_volatility_spike_filter
         self.volatility_spike_multiplier = volatility_spike_multiplier
+        self.post_news_cooldown_minutes = (
+            post_news_cooldown_minutes
+            if post_news_cooldown_minutes is not None
+            else (getattr(settings, "post_news_cooldown_minutes", 15) if settings else 15)
+        )
 
     def get_currencies_for_symbol(self, symbol: str) -> List[str]:
         """Extracts the base and quote currency codes from symbol."""
@@ -74,8 +87,15 @@ class NewsFilter:
 
             for start_min, end_min, curr, desc in self.SCHEDULED_WINDOWS:
                 if curr in sym_currencies:
-                    if start_min <= minute_of_day <= end_min:
-                        return True, f"News Window ({desc})"
+                    effective_end = end_min + self.post_news_cooldown_minutes
+                    if start_min <= minute_of_day <= effective_end:
+                        in_cooldown = minute_of_day > end_min
+                        label = (
+                            f"News Window ({desc} + {self.post_news_cooldown_minutes}m Cooldown)"
+                            if in_cooldown
+                            else f"News Window ({desc})"
+                        )
+                        return True, label
 
         # 2. Check Dynamic Volatility Shock (Spike Candle Filter)
         if self.enable_volatility_spike_filter and current_candle and history and len(history) >= 15:

@@ -22,13 +22,42 @@ class RiskEngine:
         min_lot_size: float = 0.05,
         max_lot_size: float = 1.0,
         default_lot_size: float = 0.05,
+        max_setup_risk_usd: float | None = None,
+        positions_per_trade: int = 2,
     ) -> None:
+        settings = None
+        try:
+            from app.core.settings import get_settings
+            settings = get_settings().analysis
+        except Exception:
+            pass
+
         self.max_open_trades = max_open_trades
         self.max_trades_per_symbol = max_trades_per_symbol
         self.risk_per_trade_pct = risk_per_trade_pct
         self.min_lot_size = min_lot_size
         self.max_lot_size = max_lot_size
         self.default_lot_size = default_lot_size
+        self.positions_per_trade = positions_per_trade
+        self.max_setup_risk_usd = (
+            max_setup_risk_usd
+            if max_setup_risk_usd is not None
+            else (getattr(settings, "max_setup_risk_usd", 9.50) if settings else 9.50)
+        )
+
+    @staticmethod
+    def estimate_pip_value_usd(symbol: str) -> float:
+        """Estimates USD pip value for 1.0 standard lot."""
+        s = symbol.upper()
+        if "JPY" in s:
+            return 6.5
+        if s.endswith("CHF") or "CHF" in s:
+            return 12.2
+        if s.endswith("GBP") or "GBP" in s:
+            return 13.4
+        if s.endswith("CAD") or "CAD" in s:
+            return 7.2
+        return 10.0
 
     def check(
         self,
@@ -75,26 +104,41 @@ class RiskEngine:
                 reason="Invalid stop loss: distance to entry is zero",
             )
 
-        # 5. Position Sizing (Fixed 0.05 default or dynamically scaled above $50)
+        # 5. Position Sizing & Hard Setup Dollar Risk Cap
         is_jpy = "JPY" in symbol.upper()
         pip_size = 0.01 if is_jpy else 0.0001
         pips_at_risk = sl_dist / pip_size
-        pip_value_std = 6.5 if is_jpy else 10.0
+        pip_value_usd = self.estimate_pip_value_usd(symbol)
 
         computed_lot = self.default_lot_size
         if balance > 50.0:
             risk_capital = balance * self.risk_per_trade_pct
             if pips_at_risk > 0:
-                raw_lots = risk_capital / (pips_at_risk * pip_value_std)
+                raw_lots = risk_capital / (pips_at_risk * pip_value_usd)
                 computed_lot = max(self.min_lot_size, min(round(raw_lots, 2), self.max_lot_size))
         else:
             computed_lot = self.default_lot_size
 
-        risk_amount = round(pips_at_risk * pip_value_std * computed_lot, 2)
+        single_risk_amount = round(pips_at_risk * pip_value_usd * computed_lot, 2)
+        total_setup_risk = round(single_risk_amount * self.positions_per_trade, 2)
+
+        # Hard dollar risk guard across all setup positions
+        if self.max_setup_risk_usd and self.max_setup_risk_usd > 0:
+            if total_setup_risk > self.max_setup_risk_usd:
+                return RiskAssessment(
+                    approved=False,
+                    reason=(
+                        f"Setup risk (${total_setup_risk:.2f}) exceeds max allowed "
+                        f"risk (${self.max_setup_risk_usd:.2f}) across {self.positions_per_trade} "
+                        f"positions ({pips_at_risk:.1f} pips SL)"
+                    ),
+                    lot_size=computed_lot,
+                    risk_amount=single_risk_amount,
+                )
 
         return RiskAssessment(
             approved=True,
             reason="Approved",
             lot_size=computed_lot,
-            risk_amount=risk_amount,
+            risk_amount=single_risk_amount,
         )

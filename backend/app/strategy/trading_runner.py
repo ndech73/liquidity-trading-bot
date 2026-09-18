@@ -65,7 +65,7 @@ class TradingRunner:
         exit_engine: ExitEngine | None = None,
         poll_interval_seconds: float = 10.0,
         htf_alignment_symbols: list[str] | None = None,
-        max_stop_loss_pips: float = 22.0,
+        max_stop_loss_pips: float | None = None,
         enable_news_filter: bool = True,
         news_filter: NewsFilter | None = None,
     ) -> None:
@@ -106,12 +106,18 @@ class TradingRunner:
             else (getattr(settings, "enable_news_filter", True) if settings else True)
         )
         self.news_filter = news_filter or (NewsFilter() if self.enable_news_filter else None)
-        self.max_stop_loss_pips = max_stop_loss_pips
+        self.max_stop_loss_pips = (
+            max_stop_loss_pips
+            if max_stop_loss_pips is not None
+            else (getattr(settings, "max_stop_loss_pips", 10.0) if settings else 10.0)
+        )
         self.risk_engine = risk_engine or RiskEngine(
             default_lot_size=0.05,
             min_lot_size=0.05,
             max_open_trades=10,
             max_trades_per_symbol=2,
+            max_setup_risk_usd=getattr(settings, "max_setup_risk_usd", 9.50) if settings else 9.50,
+            positions_per_trade=self.positions_per_trade,
         )
         self.entry_engine = entry_engine or EntryEngine(
             allow_ranging_trend=True,
@@ -126,7 +132,7 @@ class TradingRunner:
             require_stay_beyond=False,
             min_volume_multiplier=0.0,
             rejection_close_range_pct=0.50,
-            max_stop_loss_pips=max_stop_loss_pips,
+            max_stop_loss_pips=self.max_stop_loss_pips,
         )
         self.exit_engine = exit_engine or ExitEngine(
             risk_reward_ratio=3.0,

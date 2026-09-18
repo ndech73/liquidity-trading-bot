@@ -252,7 +252,7 @@ class EntryEngine:
         self.max_stop_loss_pips = (
             max_stop_loss_pips
             if max_stop_loss_pips is not None
-            else getattr(settings, "max_stop_loss_pips", 22.0)
+            else getattr(settings, "max_stop_loss_pips", 10.0)
         )
 
         if self.rejection_confirmation_candles < 0:
