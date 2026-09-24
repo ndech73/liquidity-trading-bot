@@ -146,6 +146,7 @@ class EntryEngine:
         enable_session_filter: bool | None = None,
         session_start_hour_utc: int | None = None,
         session_end_hour_utc: int | None = None,
+        min_stop_loss_pips: float | None = None,
         max_stop_loss_pips: float | None = None,
         htf_alignment_symbols: list[str] | None = None,
     ) -> None:
@@ -249,10 +250,15 @@ class EntryEngine:
             if session_end_hour_utc is not None
             else getattr(settings, "session_end_hour_utc", 18)
         )
+        self.min_stop_loss_pips = (
+            min_stop_loss_pips
+            if min_stop_loss_pips is not None
+            else getattr(settings, "min_stop_loss_pips", 8.0)
+        )
         self.max_stop_loss_pips = (
             max_stop_loss_pips
             if max_stop_loss_pips is not None
-            else getattr(settings, "max_stop_loss_pips", 10.0)
+            else getattr(settings, "max_stop_loss_pips", 22.0)
         )
 
         if self.rejection_confirmation_candles < 0:
@@ -358,11 +364,23 @@ class EntryEngine:
                 continue
 
             stop_loss = self._compute_stop_loss(direction, event.sweep_price)
+            pip_size = 0.01 if "JPY" in event.symbol.upper() else 0.0001
+            risk_dist = abs(confirmation_candle.close - stop_loss)
+            risk_pips = risk_dist / pip_size
+
+            # Ensure stop loss has at least min_stop_loss_pips breathing room beyond spread noise
+            if self.min_stop_loss_pips is not None and self.min_stop_loss_pips > 0:
+                min_dist = self.min_stop_loss_pips * pip_size
+                if risk_dist < min_dist:
+                    if direction == TradeDirection.BUY:
+                        stop_loss = confirmation_candle.close - min_dist
+                    else:
+                        stop_loss = confirmation_candle.close + min_dist
+                    risk_dist = min_dist
+                    risk_pips = self.min_stop_loss_pips
 
             # Max stop loss filter: reject setups where risk exceeds max_stop_loss_pips
             if self.max_stop_loss_pips is not None and self.max_stop_loss_pips > 0:
-                pip_size = 0.01 if "JPY" in event.symbol.upper() else 0.0001
-                risk_pips = abs(confirmation_candle.close - stop_loss) / pip_size
                 if risk_pips > self.max_stop_loss_pips:
                     continue
 

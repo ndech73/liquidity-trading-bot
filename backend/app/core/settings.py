@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -20,8 +21,9 @@ class AnalysisEngineSettings(BaseModel):
     allow_ranging_trend: bool = True
     require_expansion: bool = False
     require_htf_alignment: bool = True
-    max_stop_loss_pips: float | None = 10.0
-    max_setup_risk_usd: float = 3.50
+    min_stop_loss_pips: float = 8.0
+    max_stop_loss_pips: float | None = 22.0
+    max_setup_risk_usd: float = 5.50
     min_penetration_ticks: int = 0
     min_penetration_atr_ratio: float = 0.10
     min_penetration_pips_floor: float = 0.8
@@ -30,7 +32,7 @@ class AnalysisEngineSettings(BaseModel):
     rejection_close_range_pct: float = 0.50
     min_volume_multiplier: float = 0.0
     volume_ma_period: int = 20
-    require_trend_alignment: bool = False
+    require_trend_alignment: bool = True
     require_recent_compression: bool = False
     compression_lookback_candles: int = 6
     # Early Break-Even configuration
@@ -70,7 +72,7 @@ class Settings(BaseSettings):
     analysis: AnalysisEngineSettings = Field(default_factory=AnalysisEngineSettings)
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "backend/.env", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")),
         env_file_encoding="utf-8",
         extra="ignore",
     )

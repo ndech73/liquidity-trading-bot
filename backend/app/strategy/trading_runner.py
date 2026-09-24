@@ -16,7 +16,7 @@ Live automated trading runner and background engine.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Set, Optional
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -57,9 +57,9 @@ class TradingRunner:
         tp2_rr: float = 3.0,
         enable_friday_close: bool = True,
         friday_close_hour_utc: int = 20,
-        enable_session_filter: bool = True,
-        session_start_hour_utc: int = 7,
-        session_end_hour_utc: int = 18,
+        enable_session_filter: bool | None = None,
+        session_start_hour_utc: int | None = None,
+        session_end_hour_utc: int | None = None,
         risk_engine: RiskEngine | None = None,
         entry_engine: EntryEngine | None = None,
         exit_engine: ExitEngine | None = None,
@@ -97,41 +97,55 @@ class TradingRunner:
         self.tp2_rr = tp2_rr
         self.enable_friday_close = enable_friday_close
         self.friday_close_hour_utc = friday_close_hour_utc
-        self.enable_session_filter = enable_session_filter
-        self.session_start_hour_utc = session_start_hour_utc
-        self.session_end_hour_utc = session_end_hour_utc
+        self.enable_session_filter = (
+            enable_session_filter
+            if enable_session_filter is not None
+            else (getattr(settings, "enable_session_filter", True) if settings else True)
+        )
+        self.session_start_hour_utc = (
+            session_start_hour_utc
+            if session_start_hour_utc is not None
+            else (getattr(settings, "session_start_hour_utc", 7) if settings else 7)
+        )
+        self.session_end_hour_utc = (
+            session_end_hour_utc
+            if session_end_hour_utc is not None
+            else (getattr(settings, "session_end_hour_utc", 18) if settings else 18)
+        )
         self.enable_news_filter = (
             enable_news_filter
             if enable_news_filter is not None
             else (getattr(settings, "enable_news_filter", True) if settings else True)
         )
         self.news_filter = news_filter or (NewsFilter() if self.enable_news_filter else None)
+        self.min_stop_loss_pips = getattr(settings, "min_stop_loss_pips", 8.0) if settings else 8.0
         self.max_stop_loss_pips = (
             max_stop_loss_pips
             if max_stop_loss_pips is not None
-            else (getattr(settings, "max_stop_loss_pips", 10.0) if settings else 10.0)
+            else (getattr(settings, "max_stop_loss_pips", 22.0) if settings else 22.0)
         )
         self.risk_engine = risk_engine or RiskEngine(
             default_lot_size=0.01,
             min_lot_size=0.01,
             max_open_trades=10,
             max_trades_per_symbol=2,
-            max_setup_risk_usd=getattr(settings, "max_setup_risk_usd", 3.50) if settings else 3.50,
+            max_setup_risk_usd=getattr(settings, "max_setup_risk_usd", 5.50) if settings else 5.50,
             positions_per_trade=self.positions_per_trade,
         )
         self.entry_engine = entry_engine or EntryEngine(
             allow_ranging_trend=True,
-            enable_session_filter=enable_session_filter,
-            session_start_hour_utc=session_start_hour_utc,
-            session_end_hour_utc=session_end_hour_utc,
+            enable_session_filter=self.enable_session_filter,
+            session_start_hour_utc=self.session_start_hour_utc,
+            session_end_hour_utc=self.session_end_hour_utc,
             require_rejection_confirmation=True,
             require_expansion=False,
             require_htf_alignment=True,
-            require_trend_alignment=False,
+            require_trend_alignment=getattr(settings, "require_trend_alignment", True) if settings else True,
             min_penetration_ticks=0,
             require_stay_beyond=False,
             min_volume_multiplier=0.0,
             rejection_close_range_pct=0.50,
+            min_stop_loss_pips=self.min_stop_loss_pips,
             max_stop_loss_pips=self.max_stop_loss_pips,
         )
         self.exit_engine = exit_engine or ExitEngine(
@@ -153,7 +167,28 @@ class TradingRunner:
         self.executor = MT5Executor()
         self.tracked_zones: dict[str, list[LiquidityZone]] = {}
         self.executed_setup_keys: set[str] = set()
+        self.symbol_cooldown_minutes: int = 30
+        self.last_trade_time_per_symbol: dict[str, datetime] = {}
         self._is_running = False
+        self._seed_recent_trades()
+
+    def _seed_recent_trades(self) -> None:
+        """Seeds executed setup keys and symbol cooldown times from recent database records."""
+        try:
+            db: Session = SessionLocal()
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+            recent_trades = db.query(TradeModel).filter(TradeModel.opened_at >= cutoff).all()
+            for t in recent_trades:
+                sym = t.symbol.upper()
+                if t.opened_at:
+                    t_opened = t.opened_at if t.opened_at.tzinfo else t.opened_at.replace(tzinfo=timezone.utc)
+                    if sym not in self.last_trade_time_per_symbol or t_opened > self.last_trade_time_per_symbol[sym]:
+                        self.last_trade_time_per_symbol[sym] = t_opened
+            db.close()
+            if self.last_trade_time_per_symbol:
+                logger.info(f"[TradingRunner] Initialized cooldown tracking for symbols: {list(self.last_trade_time_per_symbol.keys())}")
+        except Exception as e:
+            logger.debug(f"[TradingRunner] Could not seed recent trades from DB: {e}")
 
     def get_tracked_zones(self, symbol: str, timeframe_str: str) -> list[LiquidityZone]:
         key = f"{symbol.upper()}:{timeframe_str.lower()}"
@@ -484,8 +519,9 @@ class TradingRunner:
         if not scan_for_entries or symbol.upper() in open_symbols:
             return
 
-        # Session / Killzone Filter: Avoid Asian and rollover low-volume dead zones (21:00 - 06:45 UTC)
         now_utc = datetime.now(timezone.utc)
+
+        # Session / Killzone Filter: Avoid Asian and rollover low-volume dead zones (21:00 - 06:45 UTC)
         if self.enable_session_filter:
             if now_utc.hour < self.session_start_hour_utc or now_utc.hour >= self.session_end_hour_utc:
                 return
@@ -544,9 +580,20 @@ class TradingRunner:
                     continue  # Stale setup
 
             sig_tf_str = signal.timeframe.value if hasattr(signal.timeframe, "value") else str(signal.timeframe)
-            setup_key = f"{signal.symbol}_{sig_tf_str}_{signal.zone_id}_{signal.signal_time.isoformat()}"
+            setup_key = f"{signal.symbol.upper()}_{sig_tf_str}_{signal.direction.value}_{signal.signal_time.isoformat()}"
             if setup_key in self.executed_setup_keys:
                 continue
+
+            # Symbol-level cooldown: avoid rapid-fire repeat trades on the same pair
+            if signal.symbol.upper() in self.last_trade_time_per_symbol:
+                last_time = self.last_trade_time_per_symbol[signal.symbol.upper()]
+                elapsed_minutes = (now_utc - last_time).total_seconds() / 60.0
+                if elapsed_minutes < self.symbol_cooldown_minutes:
+                    logger.info(
+                        f"[TradingRunner] Skipping signal for {signal.symbol}: "
+                        f"in cooldown ({elapsed_minutes:.1f}/{self.symbol_cooldown_minutes}m)"
+                    )
+                    continue
 
             # Check price validity against current tick
             exits = self.exit_engine.compute_exit_levels(signal)
@@ -585,6 +632,8 @@ class TradingRunner:
                 logger.info(f"[TradingRunner] Signal for {signal.symbol} ({sig_tf_str}) rejected by risk engine: {risk_res.reason}")
                 continue
 
+            assigned_lot = risk_res.lot_size
+
             # 8. Execute live orders on MT5 (Split targets: P1 = conservative TP1, P2 = runner TP2)
             opened_any = False
             for pos_num in range(1, self.positions_per_trade + 1):
@@ -612,12 +661,12 @@ class TradingRunner:
                 comment_tag = f"LiquidityBot P{pos_num}-R{target_rr:.1f}"
                 logger.info(
                     f"[TradingRunner] Executing {signal.direction.value.upper()} position {pos_num}/{self.positions_per_trade} "
-                    f"on {signal.symbol} [{sig_tf_str}] ({risk_res.lot_size} lots) | SL={pos_exits.stop_loss:.5f} | TP={pos_exits.take_profit:.5f} (RR: {target_rr})"
+                    f"on {signal.symbol} [{sig_tf_str}] ({assigned_lot} lots) | SL={pos_exits.stop_loss:.5f} | TP={pos_exits.take_profit:.5f} (RR: {target_rr})"
                 )
                 order_res = self.executor.open_order(
                     symbol=signal.symbol,
                     order_type=signal.direction.value,
-                    volume=risk_res.lot_size,
+                    volume=assigned_lot,
                     stop_loss=pos_exits.stop_loss,
                     take_profit=pos_exits.take_profit,
                     comment=comment_tag,
@@ -635,7 +684,7 @@ class TradingRunner:
                             ticket=ticket,
                             symbol=signal.symbol,
                             order_type=signal.direction.value.upper(),
-                            lots=risk_res.lot_size,
+                            lots=assigned_lot,
                             open_price=fill_price,
                             stop_loss=pos_exits.stop_loss,
                             take_profit=pos_exits.take_profit,
@@ -648,7 +697,7 @@ class TradingRunner:
                         db.commit()
                         logger.success(
                             f"[TradingRunner] Opened position {pos_num}/{self.positions_per_trade} "
-                            f"(Ticket #{ticket}) on {signal.symbol} [{sig_tf_str}] ({risk_res.lot_size} lots)!"
+                            f"(Ticket #{ticket}) on {signal.symbol} [{sig_tf_str}] ({assigned_lot} lots)!"
                         )
                     except Exception as e:
                         logger.error(f"[TradingRunner] Error saving trade to DB: {e}")
@@ -663,6 +712,7 @@ class TradingRunner:
 
             if opened_any:
                 self.executed_setup_keys.add(setup_key)
+                self.last_trade_time_per_symbol[signal.symbol.upper()] = now_utc
                 open_symbols.add(signal.symbol.upper())
                 break  # Setup executed with 2 positions
 
