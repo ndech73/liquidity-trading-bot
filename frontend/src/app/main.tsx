@@ -11,3 +11,12 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     </AppProviders>
   </React.StrictMode>
 );
+
+// Register service worker for background push notifications if supported
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.debug('[ServiceWorker] Registration skipped:', err);
+    });
+  });
+}

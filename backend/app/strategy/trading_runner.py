@@ -164,6 +164,12 @@ class TradingRunner:
         )
         self.poll_interval_seconds = poll_interval_seconds
 
+        self.auto_trade_enabled: bool = (
+            getattr(settings, "auto_trade_enabled", False) if settings else False
+        )
+        self.recent_alerts: list[dict] = []
+        self._loop: asyncio.AbstractEventLoop | None = None
+
         self.executor = MT5Executor()
         self.tracked_zones: dict[str, list[LiquidityZone]] = {}
         self.executed_setup_keys: set[str] = set()
@@ -171,6 +177,18 @@ class TradingRunner:
         self.last_trade_time_per_symbol: dict[str, datetime] = {}
         self._is_running = False
         self._seed_recent_trades()
+
+    def broadcast_notification(self, channel: str, message_type: str, data: dict) -> None:
+        """Thread-safe broadcast of alerts and sweep events to connected browser clients."""
+        try:
+            from app.api.websocket import manager
+            if self._loop and self._loop.is_running():
+                asyncio.run_coroutine_threadsafe(
+                    manager.broadcast(channel, message_type, data),
+                    self._loop,
+                )
+        except Exception as e:
+            logger.debug(f"[TradingRunner] Broadcast notification notice: {e}")
 
     def _seed_recent_trades(self) -> None:
         """Seeds executed setup keys and symbol cooldown times from recent database records."""
@@ -201,7 +219,9 @@ class TradingRunner:
     async def run(self) -> None:
         """Main background loop."""
         self._is_running = True
-        logger.info("[TradingRunner] Automated trading runner started.")
+        self._loop = asyncio.get_running_loop()
+        mode_str = "AUTO-TRADE" if self.auto_trade_enabled else "ALERT / SCANNER ONLY (Discretionary Mode)"
+        logger.info(f"[TradingRunner] Liquidity Trading Runner active in [{mode_str}] mode.")
         while self._is_running:
             try:
                 await asyncio.to_thread(self.cycle)
@@ -634,6 +654,44 @@ class TradingRunner:
 
             assigned_lot = risk_res.lot_size
 
+            # 7b. Discretionary Alert Mode Check
+            # When auto_trade_enabled is False, do NOT execute on MT5. Broadcast actionable browser alert instead.
+            if not self.auto_trade_enabled:
+                pos_exits_tp1 = self.exit_engine.compute_exit_levels(signal, custom_rr=self.tp1_rr)
+                pos_exits_tp2 = self.exit_engine.compute_exit_levels(signal, custom_rr=self.tp2_rr)
+                pip_size = 0.01 if "JPY" in signal.symbol.upper() else 0.0001
+                risk_pips = round(abs(current_price - exits.stop_loss) / pip_size, 1)
+
+                alert_data = {
+                    "id": f"alert-{int(now_utc.timestamp())}-{signal.symbol.upper()}",
+                    "symbol": signal.symbol.upper(),
+                    "timeframe": sig_tf_str,
+                    "direction": signal.direction.value.upper(),
+                    "entryPrice": round(current_price, 5),
+                    "stopLoss": round(exits.stop_loss, 5),
+                    "takeProfit1": round(pos_exits_tp1.take_profit, 5),
+                    "takeProfit2": round(pos_exits_tp2.take_profit, 5),
+                    "riskPips": risk_pips,
+                    "rrRatio": self.tp1_rr,
+                    "setupType": "Liquidity Sweep Reversal",
+                    "reason": f"{signal.direction.value.upper()} signal on {signal.symbol} [{sig_tf_str}] following liquidity pool raid and rejection confirmation.",
+                    "timestamp": now_utc.isoformat(),
+                }
+
+                self.recent_alerts.insert(0, alert_data)
+                if len(self.recent_alerts) > 50:
+                    self.recent_alerts.pop()
+
+                self.broadcast_notification("notifications", "liquidity_alert", alert_data)
+                logger.success(
+                    f"[TradingRunner] 🚨 [SIGNAL ALERT] {signal.symbol} {signal.direction.value.upper()} @ {current_price:.5f} | "
+                    f"SL: {exits.stop_loss:.5f} | TP1: {pos_exits_tp1.take_profit:.5f} | TP2: {pos_exits_tp2.take_profit:.5f} "
+                    f"({risk_pips} pips risk) [Discretionary Mode - No MT5 Order Placed]"
+                )
+                self.executed_setup_keys.add(setup_key)
+                self.last_trade_time_per_symbol[signal.symbol.upper()] = now_utc
+                break
+
             # 8. Execute live orders on MT5 (Split targets: P1 = conservative TP1, P2 = runner TP2)
             opened_any = False
             for pos_num in range(1, self.positions_per_trade + 1):
@@ -779,6 +837,19 @@ class TradingRunner:
                         occurred_at=ev.occurred_at,
                     )
                     db.add(db_event)
+
+                    # Real-time sweep alert broadcast
+                    sweep_notice = {
+                        "id": f"sweep-{int(ev.occurred_at.timestamp())}-{symbol.upper()}",
+                        "symbol": symbol.upper(),
+                        "timeframe": timeframe_str,
+                        "side": ev.side.value.upper(),
+                        "liquidityType": ev.liquidity_type.value if hasattr(ev.liquidity_type, "value") else str(ev.liquidity_type),
+                        "levelPrice": round(ev.level_price, 5),
+                        "sweepPrice": round(ev.sweep_price, 5),
+                        "occurredAt": ev.occurred_at.isoformat(),
+                    }
+                    self.broadcast_notification("notifications", "sweep_detected", sweep_notice)
 
             # 3. Persist latest Market Snapshot
             vol_regime = snapshot.volatility.regime.value if snapshot.volatility else "NORMAL"

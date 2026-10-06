@@ -47,17 +47,19 @@ class AnalysisEngineSettings(BaseModel):
     # High-Impact Macroeconomic News & Volatility Filter
     enable_news_filter: bool = True
     post_news_cooldown_minutes: int = 15
+    # Auto-trade vs Alert/Scanner mode (False = Alert Scanner Mode, True = Auto-execute live orders on MT5)
+    auto_trade_enabled: bool = False
+    alert_cooldown_minutes: int = 15
 
 
 AnalysisSettings = AnalysisEngineSettings
 
-# Approved 7 High-Alpha Production Trading Basket
+# Approved High-Alpha Production Trading Basket (EURGBP removed due to negative statistical expectancy)
 PRODUCTION_WATCHLIST: list[str] = [
     "EURJPY",
     "USDCHF",
     "NZDUSD",
     "USDCAD",
-    "EURGBP",
     "GBPUSD",
     "EURUSD",
 ]

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Activity, Wallet, Radio } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
 
 export interface TopbarProps {
   botStatus?: 'RUNNING' | 'PAUSED' | 'OFFLINE';
@@ -53,6 +54,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             </span>
           </div>
         </div>
+        <NotificationBell />
         <div className="w-8 h-8 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-xs border border-sky-500/30">
           MT5
         </div>

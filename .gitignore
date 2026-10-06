@@ -19,3 +19,5 @@ data/backtests/*
 # IDE
 .vscode/
 .idea/
+backend/app/scratch/
+*.tsbuildinfo

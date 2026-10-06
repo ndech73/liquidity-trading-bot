@@ -15,6 +15,7 @@ from app.api.forensics import router as forensics_router
 import asyncio
 from app.api.performance import router as performance_router
 from app.api.settings import router as settings_router
+from app.api.notifications import router as notifications_router
 from app.api.websocket import router as ws_router, ws_relay_worker
 from app.strategy.trading_runner import trading_bot_worker, trading_runner
 
@@ -70,6 +71,7 @@ app.include_router(analysis_router, prefix="/api", tags=["analysis"])
 app.include_router(forensics_router, prefix="/api", tags=["forensics"])
 app.include_router(performance_router, prefix="/api", tags=["performance"])
 app.include_router(settings_router, prefix="/api", tags=["settings"])
+app.include_router(notifications_router, prefix="/api", tags=["notifications"])
 app.include_router(ws_router, tags=["websocket"])
 
 

@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { MobileNavigation } from './MobileNavigation';
+import { AlertToast } from './AlertToast';
 import { useAccount } from '../shared/hooks/useAccount';
 
 export const AppLayout: React.FC = () => {
@@ -53,6 +54,7 @@ export const AppLayout: React.FC = () => {
           <Outlet context={{ isSidebarCollapsed: isCollapsed }} />
         </main>
       </div>
+      <AlertToast />
       <MobileNavigation />
     </div>
   );

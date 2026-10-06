@@ -1,5 +1,6 @@
 import { ENV } from '../../config/env';
 import { WebSocketMessage } from '../types/api';
+import { notificationService } from './notificationService';
 
 export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 type MessageHandler = (data: WebSocketMessage) => void;
@@ -75,6 +76,16 @@ class WebSocketClient {
       this.ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
+
+          // Route trading & sweep notifications
+          if (payload.channel === 'notifications') {
+            if (payload.type === 'liquidity_alert' && payload.data) {
+              notificationService.dispatchAlert(payload.data);
+            } else if (payload.type === 'sweep_detected' && payload.data) {
+              notificationService.dispatchSweep(payload.data);
+            }
+          }
+
           this.handlers.forEach((handler) => handler(payload));
         } catch (e) {
           console.error('[WebSocket] Message parse error:', e);
