@@ -198,27 +198,21 @@ def gather_live_state() -> Dict[str, Any]:
 
 
 async def ws_relay_worker():
-    """Background loop that relays live data to connected WebSocket clients."""
-    logger.info("[WebSocket] Relay worker loop started.")
+    """Lightweight background loop that relays periodic heartbeats to connected clients."""
+    logger.info("[WebSocket] Heartbeat relay worker loop started.")
     try:
         while True:
             if manager.count() > 0:
                 try:
-                    state = await asyncio.to_thread(gather_live_state)
-                    await manager.broadcast("markets", "quotes", state["markets"])
-                    await manager.broadcast("account", "update", state["account"])
-                    await manager.broadcast("trades", "update", state["trades"])
                     await manager.broadcast("system", "heartbeat", {
                         "clients": manager.count(),
                         "server_time": datetime.now(timezone.utc).isoformat(),
                     })
                 except Exception as e:
-                    logger.warning(f"[WebSocket] Error in relay broadcast: {e}")
-                await asyncio.sleep(2.0)
-            else:
-                await asyncio.sleep(1.0)
+                    logger.warning(f"[WebSocket] Error in heartbeat broadcast: {e}")
+            await asyncio.sleep(15.0)
     except asyncio.CancelledError:
-        logger.info("[WebSocket] Relay worker loop stopped.")
+        logger.info("[WebSocket] Heartbeat relay worker loop stopped.")
 
 
 @router.websocket("/ws")
@@ -236,30 +230,6 @@ async def websocket_endpoint(websocket: WebSocket):
         },
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
-
-    # Immediate initial state relay
-    try:
-        initial_state = await asyncio.to_thread(gather_live_state)
-        await websocket.send_json({
-            "channel": "account",
-            "type": "update",
-            "data": initial_state["account"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
-        await websocket.send_json({
-            "channel": "markets",
-            "type": "quotes",
-            "data": initial_state["markets"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
-        await websocket.send_json({
-            "channel": "trades",
-            "type": "update",
-            "data": initial_state["trades"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
-    except Exception as e:
-        logger.warning(f"[WebSocket] Error sending initial state: {e}")
 
     try:
         while True:

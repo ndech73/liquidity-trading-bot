@@ -78,24 +78,44 @@ class MT5Executor:
                 else:
                     clean_path = raw_path
 
-            # Initialize terminal connection (attaches to running terminal)
-            success = self.mt5.initialize()
-            if not success and clean_path:
-                success = self.mt5.initialize(path=clean_path)
+            # Initialize terminal connection with credentials directly to avoid modal account dialogs
+            success = False
+            int_login = int(login) if login else None
+            try:
+                if int_login and password and server:
+                    if clean_path:
+                        try:
+                            success = self.mt5.initialize(path=clean_path, login=int_login, password=password, server=server, timeout=15000)
+                        except Exception:
+                            success = False
+                    if not success:
+                        success = self.mt5.initialize(login=int_login, password=password, server=server, timeout=15000)
+                else:
+                    success = self.mt5.initialize()
+                    if not success and clean_path:
+                        success = self.mt5.initialize(path=clean_path)
+            except Exception as e:
+                logger.warning(f"Error initializing MT5: {e}")
+                success = False
+
+            if not success:
+                # Try fallback basic initialize
+                try:
+                    success = self.mt5.initialize()
+                except Exception:
+                    pass
 
             if not success:
                 last_err = self.mt5.last_error()
                 logger.error(f"MT5 initialization failed: {last_err}")
                 return False
 
-            # Authorize account if credentials are provided and not yet authorized
-            if login and password and server:
+            # Verify authorization
+            if int_login and password and server:
                 try:
                     curr_info = self.mt5.account_info()
-                    if curr_info and getattr(curr_info, "login", None) == int(login):
-                        pass  # Already authorized on this account
-                    else:
-                        login_success = self.mt5.login(int(login), password=password, server=server)
+                    if not curr_info or getattr(curr_info, "login", None) != int_login:
+                        login_success = self.mt5.login(int_login, password=password, server=server)
                         if not login_success:
                             last_err = self.mt5.last_error()
                             logger.warning(
