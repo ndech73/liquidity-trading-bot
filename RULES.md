@@ -87,7 +87,8 @@ So the count k goes into the pass marks above.
 
 | Date | Idea | k | A | B | C | D | E | F | Notes |
 |------|------|---|---|---|---|---|---|---|-------|
-| 2026-11-02 | Failed auction: sweep swing low & close > VAL (long); sweep swing high & close < VAH (short) | 2 | | | | | | | Horizon 8, M15, 6 pairs, dev data |
+| 2026-11-02 | Failed auction: sweep swing low & close > VAL (long); sweep swing high & close < VAH (short) | 2 | PASS | FAIL | PASS | PASS | PASS | - | Pattern exists (+0.061 ATR, 6/6 pairs, 92% Qs), but 0.253 ATR spread cost eats the edge. Failed B. |
+
 
 
 ## 9. Changelog
