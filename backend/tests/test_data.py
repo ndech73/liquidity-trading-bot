@@ -23,7 +23,7 @@ def raw_rates(times):
 
 
 def clean_candles(n=4):
-    times = pd.date_range("2026-01-05 00:00", periods=n, freq="15min")
+    times = pd.date_range("2024-01-05 00:00", periods=n, freq="15min")
     return pd.DataFrame(
         {
             "time": times,
