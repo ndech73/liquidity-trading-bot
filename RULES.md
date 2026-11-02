@@ -90,7 +90,7 @@ So the count k goes into the pass marks above.
 | 2026-11-02 | Failed auction: sweep swing low & close > VAL (long); sweep swing high & close < VAH (short) | 2 | PASS | FAIL | PASS | PASS | PASS | - | Pattern exists (+0.061 ATR, 6/6 pairs, 92% Qs), but 0.253 ATR spread cost eats the edge. Failed B. |
 | 2026-11-02 | Session-filtered failed auction: 10:00-19:00 server time, sweep low & close > VAL (long); sweep high & close < VAH (short) | 3 | FAIL | FAIL | FAIL | FAIL | PASS | - | Cost dropped to 0.157 ATR, but gross outcome dropped to +0.035 ATR (EURJPY negative). Failed A, B, C, D. |
 | 2026-11-02 | Major structural failed auction: sweep major swing low (left=10, right=10) & close > VAL (long); sweep major swing high (left=10, right=10) & close < VAH (short) | 4 | FAIL | FAIL | FAIL | PASS | PASS | - | Pattern stronger in USD majors (+0.10 to +0.14 ATR, D passed), but NZDUSD/EURJPY negative and spread costs (0.233 ATR) exceed outcome. Failed A, B, C. |
-| 2026-11-02 | Session momentum breakout: 10:00-19:00 server time, sweep major swing high (left=10, right=10) & close > VAH (long); sweep major swing low & close < VAL (short) | 5 | running | running | running | running | running | - | Registered before execution. |
+| 2026-11-02 | Session momentum breakout: 10:00-19:00 server time, sweep major swing high (left=10, right=10) & close > VAH (long); sweep major swing low & close < VAL (short) | 5 | FAIL | FAIL | FAIL | FAIL | PASS | - | Strong positive net edge on EURJPY (+0.055 ATR) and GBPUSD (+0.022 ATR), but aggregate outcome (+0.040 ATR) fails cost (0.144 ATR) and quarters 67% vs 70%. Failed A, B, C, D. |
 
 
 
