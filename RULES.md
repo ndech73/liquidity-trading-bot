@@ -87,7 +87,8 @@ So the count k goes into the pass marks above.
 
 | Date | Idea | k | A | B | C | D | E | F | Notes |
 |------|------|---|---|---|---|---|---|---|-------|
-|      |      |   |   |   |   |   |   |   |       |
+| 2026-11-02 | Failed auction: sweep swing low & close > VAL (long); sweep swing high & close < VAH (short) | 2 | | | | | | | Horizon 8, M15, 6 pairs, dev data |
+
 
 ## 9. Changelog
 
