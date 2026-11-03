@@ -93,6 +93,7 @@ So the count k goes into the pass marks above.
 | 2026-11-02 | Session momentum breakout: 10:00-19:00 server time, sweep major swing high (left=10, right=10) & close > VAH (long); sweep major swing low & close < VAL (short) | 5 | FAIL | FAIL | FAIL | FAIL | PASS | - | Strong positive net edge on EURJPY (+0.055 ATR) and GBPUSD (+0.022 ATR), but aggregate outcome (+0.040 ATR) fails cost (0.144 ATR) and quarters 67% vs 70%. Failed A, B, C, D. |
 | 2026-11-02 | Asian range sweep at London open: 08:00-12:00 server time, sweep Asian low & close > low (long); sweep Asian high & close < high (short) | 6 | FAIL | FAIL | FAIL | FAIL | PASS | - | EURUSD strongly positive net (+0.047 ATR, 630 trades), but GBPUSD/EURJPY trended, aggregate cost (0.208 ATR) exceeds outcome (+0.047 ATR). Failed A, B, C, D. |
 | 2026-11-03 | Math mean reversion: Z-score (|z|>=2), memory (rho<0), acceleration brake, toll guard | 7 | FAIL | FAIL | PASS | PASS | PASS | - | Spread cost cut in half (0.123 ATR). Passed C, D (6/6 pairs positive, 75% Qs), E. Test A almost broke even (-0.003). $7 account peaked at $117.90 before 0.01 lot position risk caused drawdown. |
+| 2026-11-03 | Cost feasibility study (not an idea): Fee in ATR vs typical moves on M15, H1, H4 | - | - | - | - | - | - | - | Cost feasibility study only (no signals, no trading rules). k is not incremented. |
 
 
 
