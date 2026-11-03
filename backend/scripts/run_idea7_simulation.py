@@ -30,7 +30,7 @@ from app.market_analyzer.volatility import atr
 PAIRS = ["EURUSD", "GBPUSD", "USDCHF", "USDCAD", "NZDUSD", "EURJPY"]
 TIMEFRAME = "M15"
 K = 7
-STARTING_CAPITAL = 7.00
+STARTING_CAPITAL = 50.00
 
 
 def get_pip_info(symbol: str) -> tuple[float, float, float]:
@@ -207,10 +207,10 @@ def main():
     print("=" * 65)
 
     # -------------------------------------------------------------
-    # Simulation of the $7.00 Capital Account
+    # Simulation of the $50.00 Capital Account
     # -------------------------------------------------------------
     print("\n" + "=" * 65)
-    print("REALISTIC $7.00 CAPITAL SIMULATION (0.01 Micro-Lot)")
+    print("REALISTIC $50.00 CAPITAL SIMULATION (0.01 Micro-Lot)")
     print("=" * 65)
 
     balance = STARTING_CAPITAL
