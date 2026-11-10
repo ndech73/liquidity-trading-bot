@@ -52,6 +52,24 @@ def test_no_look_ahead(at):
     assert full.value_area_high == pytest.approx(cut.value_area_high)
     assert level_ids(full.active_levels) == level_ids(cut.active_levels)
 
+    # The WHOLE levels table must match too, every column. A column that
+    # only exists in the full-data version can hide future information.
+    assert list(full.active_levels.columns) == list(cut.active_levels.columns)
+    assert full.active_levels.reset_index(drop=True).equals(
+        cut.active_levels.reset_index(drop=True)
+    )
+
+
+def test_active_levels_do_not_reveal_the_future():
+    """
+    A level that is still active has not been crossed yet. Its "swept_at"
+    could only hold a FUTURE candle number, so it must not be handed out.
+    """
+    state = MarketAnalyzer(make_candles(), **SETTINGS).state_at(150)
+
+    assert "swept_at" not in state.active_levels.columns
+    assert (state.active_levels["known_at"] <= 150).all()
+
 
 def test_volume_profile_uses_only_the_recent_window():
     candles = make_candles(n=20)

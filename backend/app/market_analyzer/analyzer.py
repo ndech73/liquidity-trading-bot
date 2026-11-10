@@ -118,7 +118,11 @@ class MarketAnalyzer:
             atr=_clean(self._atr.iloc[at]),
             bb_width=_clean(self._width.iloc[at]),
             width_zscore=_clean(self._zscore.iloc[at]),
-            active_levels=active_levels(self._levels, at),
+            # "swept_at" is dropped on purpose. A level that is still active
+            # has not been crossed yet, so that column could only hold a
+            # FUTURE candle number (or be empty). Handing it out would let
+            # a trading rule peek at when the level gets swept later.
+            active_levels=active_levels(self._levels, at).drop(columns=["swept_at"]),
             vpoc=vpoc(profile),
             value_area_low=area_low,
             value_area_high=area_high,
