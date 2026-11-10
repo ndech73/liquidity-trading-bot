@@ -1,3 +1,13 @@
+"""
+volatility.py
+-------------
+Measures market wave heights and corridor dimensions:
+  1. True Range (TR)            : The full candle height including any surprise gaps.
+  2. Average True Range (ATR)   : Smoothed baseline wave height over 14 periods.
+  3. Bollinger Bands            : Statistical boundaries drawn at 2 standard deviations.
+  4. Bollinger Width            : Measuring whether the corridor is Squeezed or Expanding.
+"""
+
 import pandas as pd
 
 

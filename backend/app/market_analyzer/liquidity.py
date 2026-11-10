@@ -1,3 +1,13 @@
+"""
+liquidity.py
+------------
+Finds local market peaks and valleys and tracks tripwires without looking into the future:
+  1. swing_points          - Identifies local maximums (peaks) and minimums (valleys).
+  2. _first_position_beyond - Pinpoints the exact candle where a level is first swept.
+  3. liquidity_levels      - Master logbook with strict anti-cheating `known_at` timestamps.
+  4. active_levels         - Filters only what is legally known and uncrossed at candle `at`.
+"""
+
 import pandas as pd
 
 
