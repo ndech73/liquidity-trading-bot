@@ -1,3 +1,19 @@
+"""
+analyzer.py
+-----------
+Combines all market analysis tools into one unified cockpit dashboard:
+  - atr             : Smoothed wave height.
+  - bb_width        : Bollinger corridor width.
+  - width_zscore    : Is the corridor unusually wild or quiet?
+  - active_levels   : Active uncrossed peaks and valleys known up to now.
+  - vpoc            : The single price where the most trading took place.
+  - value_area_low  : Floor of the 70% value zone.
+  - value_area_high : Ceiling of the 70% value zone.
+
+GOLDEN RULE: Standing at candle `at`, we only ever use candles 0..at.
+Zero peeking into the future.
+"""
+
 from dataclasses import dataclass
 from typing import Optional
 
@@ -9,17 +25,23 @@ from app.market_analyzer.volume_profile import value_area, volume_profile, vpoc
 
 
 def _clean(value) -> Optional[float]:
+    """Turns an empty number (NaN) into None, and everything else into a float."""
     if value is None or pd.isna(value):
         return None
     return float(value)
 
 
 # ---------------------------------------------------------------
-# 1. The Package: Everything known at one single moment in time
+# 1. The Tamper-Proof Flight Folder
 # ---------------------------------------------------------------
 
 @dataclass(frozen=True)
 class MarketState:
+    """
+    Everything the model knows about the market at candle `position`.
+    A value is None when there is not enough history yet to calculate it.
+    """
+
     position: int
     atr: Optional[float]
     bb_width: Optional[float]
@@ -31,10 +53,15 @@ class MarketState:
 
 
 # ---------------------------------------------------------------
-# 2. The Master Dashboard (MarketAnalyzer)
+# 2. The Master Dashboard
 # ---------------------------------------------------------------
 
 class MarketAnalyzer:
+    """
+    Give it the candles once. Then call state_at(row_number) as many times
+    as you like for instant O(1) lookups.
+    """
+
     def __init__(
         self,
         candles: pd.DataFrame,
@@ -53,7 +80,7 @@ class MarketAnalyzer:
         self.profile_window = profile_window
         self.value_share = value_share
 
-        # Heavy math calculated once across the entire series
+        # Heavy math calculated ONCE in advance
         self._atr = atr(candles, atr_period)
         self._width = bollinger_width(candles["close"], bb_period, bb_std)
         self._zscore = self._make_zscore(self._width, zscore_window)
@@ -61,6 +88,10 @@ class MarketAnalyzer:
 
     @staticmethod
     def _make_zscore(width: pd.Series, window: int) -> pd.Series:
+        """
+        z-score = (today's width - past average width) / past standard deviation.
+        .shift(1) guarantees today is never part of its own comparison.
+        """
         history = width.rolling(window=window)
         past_mean = history.mean().shift(1)
         past_std = history.std(ddof=0).shift(1)
@@ -68,11 +99,13 @@ class MarketAnalyzer:
         return (width - past_mean) / past_std.where(past_std > 0)
 
     def state_at(self, at: int) -> MarketState:
+        """The full market picture at candle number `at` (0 = first candle)."""
         if not 0 <= at < len(self.candles):
             raise ValueError(
                 f"`at` must be between 0 and {len(self.candles) - 1}, got {at}"
             )
 
+        # Volume profile: only the last `profile_window` candles, ending at `at`.
         start = max(0, at - self.profile_window + 1)
         recent = self.candles.iloc[start : at + 1]
         profile = volume_profile(recent, self.bin_size)
