@@ -1,3 +1,12 @@
+"""
+volume_profile.py
+-----------------
+Shows at which prices most trading activity actually took place:
+  1. volume_profile - Groups prices into discrete buckets (bins) and tallies volume.
+  2. vpoc           - Volume Point of Control: the single fullest bucket (Mode).
+  3. value_area     - The 70% core price boundaries (VAL and VAH).
+"""
+
 import numpy as np
 import pandas as pd
 
