@@ -105,3 +105,4 @@ So the count k goes into the pass marks above.
 ## 9. Changelog
 
 - 2026-11-02: File created before any test was run.
+- 2026-11-12: Superseded for the final H4 test by RULES_v2.md. Rules above are unchanged.
