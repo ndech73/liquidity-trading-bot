@@ -135,6 +135,7 @@ which way it moves the result.
 
 | Date | Idea | k | A | B | C | D | E | F | Notes |
 |------|------|---|---|---|---|---|---|---|-------|
+| 2026-11-12 | H4 false-breakout trap (24h fence, rho<0, toll guard, stop-first, spread_first) | 12 | FAIL | FAIL | FAIL | PASS | PASS | - | k=12, 6 pairs H4. Gross +0.0517 ATR, cost_first 0.0622 ATR, margin_net -0.0260 ATR. 19 stop-first corrections. Verdict: NO EDGE FOUND: failed A, B, C |
 
 ## 10. Changelog
 

@@ -1,15 +1,23 @@
 """
 exit_rules.py
 -------------
-Dynamic mathematical exit rules on H1 and H4:
-  1. Target Exit (Equilibrium)   : z-score reaches 0 (rubber band has fully relaxed to the mean).
-  2. Safety Stop Loss (1.5x ATR) : Price breaches statistical boundary, cutting losses early.
-  3. Time Limit Guard (Diffusion): Exits after max_bars if price is wandering without momentum.
+Exit rules for an open trade, checked once per candle, in this order:
+  1. Stop loss  : checked FIRST. If a candle touches the stop, the trade is
+                  stopped, even if the same candle later closes at the target.
+  2. Target     : z-score reaches the target (0 = back at the average).
+  3. Time limit : the trade has been open for max_bars candles.
+
+NOT implemented: break-even stops and trailing stops. Adding either is a new
+setting and must be written in the rules file before any test uses it.
+
+Prices are candle prices (bid side). Target exits are filled at the candle's
+close, which is slightly optimistic: real fills happen a moment later.
 """
 
+import math
 from dataclasses import dataclass
 from typing import Optional
-import numpy as np
+
 import pandas as pd
 
 
@@ -17,41 +25,11 @@ import pandas as pd
 class ExitDecision:
     should_exit: bool
     exit_price: float
-    exit_reason: str  # "target_equilibrium", "stop_loss", "time_limit"
+    exit_reason: str  # "stop_loss", "target_equilibrium", "target_full_swing", "time_limit"
 
 
 # ----------------------------------------------------------------------
-# 1. Target Exit: Price snapped back to fair value (z reaches 0)
-# ----------------------------------------------------------------------
-
-def check_target_exit(
-    direction: int,
-    current_close: float,
-    current_z_score: float,
-) -> Optional[ExitDecision]:
-    """
-    Takes profit as soon as price returns to the 24-hour moving average:
-      - Long  (+1) : exit when z >= 0
-      - Short (-1) : exit when z <= 0
-    """
-    if direction == 1 and current_z_score >= 0.0:
-        return ExitDecision(
-            should_exit=True,
-            exit_price=current_close,
-            exit_reason="target_equilibrium",
-        )
-    elif direction == -1 and current_z_score <= 0.0:
-        return ExitDecision(
-            should_exit=True,
-            exit_price=current_close,
-            exit_reason="target_equilibrium",
-        )
-
-    return None
-
-
-# ----------------------------------------------------------------------
-# 2. Stop Loss Exit: Price broke beyond statistical boundary (1.5x ATR)
+# 1. Stop Loss Exit (checked FIRST)
 # ----------------------------------------------------------------------
 
 def check_stop_loss_exit(
@@ -61,31 +39,78 @@ def check_stop_loss_exit(
     current_low: float,
     current_atr: float,
     stop_loss_atr: float = 1.5,
+    stop_price: Optional[float] = None,
+    current_open: Optional[float] = None,
 ) -> Optional[ExitDecision]:
     """
-    Emergency exit if price moves 1.5x ATR against the trade.
+    Stops the trade if the candle touched the stop price.
+      - Long  (+1): the candle's low is at or below the stop.
+      - Short (-1): the candle's high is at or above the stop.
+    If the candle OPENED past the stop (a gap), the fill is the open, which
+    is worse than the stop. Pass current_open so gaps are handled.
+    If stop_price is not given, the stop is stop_loss_atr x ATR from entry.
     """
-    max_loss_distance = stop_loss_atr * current_atr
+    if direction not in (1, -1):
+        raise ValueError(f"direction must be +1 or -1, got {direction}")
 
-    # For Long trade (+1): stop sits below entry
-    if direction == 1:
-        stop_price = entry_price - max_loss_distance
-        if current_low <= stop_price:
-            return ExitDecision(
-                should_exit=True,
-                exit_price=stop_price,
-                exit_reason="stop_loss",
-            )
+    if stop_price is None:
+        if not current_atr > 0:  # also catches NaN
+            raise ValueError("ATR must be above 0 to place a stop")
+        stop_price = entry_price - direction * stop_loss_atr * current_atr
 
-    # For Short trade (-1): stop sits above entry
-    elif direction == -1:
-        stop_price = entry_price + max_loss_distance
-        if current_high >= stop_price:
-            return ExitDecision(
-                should_exit=True,
-                exit_price=stop_price,
-                exit_reason="stop_loss",
-            )
+    if math.isnan(stop_price):
+        raise ValueError("stop_price is NaN")
+
+    if direction == 1 and current_low <= stop_price:
+        fill = stop_price if current_open is None else min(current_open, stop_price)
+    elif direction == -1 and current_high >= stop_price:
+        fill = stop_price if current_open is None else max(current_open, stop_price)
+    else:
+        return None
+
+    return ExitDecision(
+        should_exit=True,
+        exit_price=float(fill),
+        exit_reason="stop_loss",
+    )
+
+
+# ----------------------------------------------------------------------
+# 2. Target Exit: Equilibrium (z = 0) or Full Swing (z beyond target_z)
+# ----------------------------------------------------------------------
+
+def check_target_exit(
+    direction: int,
+    current_close: float,
+    current_z_score: float,
+    target_z: float = 0.0,
+) -> Optional[ExitDecision]:
+    """
+    Takes profit when the z-score reaches the target:
+      - Long  (+1): exit when z >= target_z
+      - Short (-1): exit when z <= -target_z
+      - target_z = 0.0 : price is back at its recent average (equilibrium)
+      - target_z > 0.0 : price went on to the other side (full swing)
+
+    Note: the z-score uses a moving average that slides with price, so "z
+    reached 0" does not always mean price moved in your favour.
+    """
+    if direction not in (1, -1):
+        raise ValueError(f"direction must be +1 or -1, got {direction}")
+    if target_z < 0:
+        raise ValueError(f"target_z must be 0 or more, got {target_z}")
+
+    # Not enough history to calculate z yet: no target signal.
+    if math.isnan(current_z_score):
+        return None
+
+    reason = "target_full_swing" if target_z > 0.0 else "target_equilibrium"
+
+    if direction == 1 and current_z_score >= target_z:
+        return ExitDecision(should_exit=True, exit_price=current_close, exit_reason=reason)
+
+    if direction == -1 and current_z_score <= -target_z:
+        return ExitDecision(should_exit=True, exit_price=current_close, exit_reason=reason)
 
     return None
 
@@ -101,32 +126,56 @@ def check_trade_exit(
     current_z_score: float,
     current_atr: float,
     bars_held: int,
+    *,
+    max_bars: int,
     stop_loss_atr: float = 1.5,
-    max_bars: int = 16,
+    target_z: float = 0.0,
+    active_stop_price: Optional[float] = None,
 ) -> Optional[ExitDecision]:
     """
-    Evaluates whether an active trade should exit on the current candle:
-      1. Profit Target Check (Equilibrium z = 0)
-      2. Safety Stop Loss Check (1.5x ATR breach)
-      3. Time Limit Diffusion Check (max_bars reached)
+    Decides whether an open trade should exit on the current candle:
+      1. Stop loss FIRST (uses the candle's open to handle gaps).
+      2. Target second.
+      3. Time limit third.
+
+    max_bars has no default on purpose: the right value depends on the
+    timeframe, and a wrong default would change results without any warning.
+    The candle must have "open", "high", "low" and "close" (a missing one
+    raises an error).
     """
+    if max_bars < 1:
+        raise ValueError(f"max_bars must be at least 1, got {max_bars}")
+
+    current_open = float(current_candle["open"])
     current_high = float(current_candle["high"])
     current_low = float(current_candle["low"])
     current_close = float(current_candle["close"])
 
-    # 1. Check profit target
-    target_exit = check_target_exit(direction, current_close, current_z_score)
-    if target_exit is not None:
-        return target_exit
-
-    # 2. Check safety stop loss
+    # 1. Stop loss FIRST
     stop_exit = check_stop_loss_exit(
-        direction, entry_price, current_high, current_low, current_atr, stop_loss_atr
+        direction=direction,
+        entry_price=entry_price,
+        current_high=current_high,
+        current_low=current_low,
+        current_atr=current_atr,
+        stop_loss_atr=stop_loss_atr,
+        stop_price=active_stop_price,
+        current_open=current_open,
     )
     if stop_exit is not None:
         return stop_exit
 
-    # 3. Check time limit
+    # 2. Profit target
+    target_exit = check_target_exit(
+        direction=direction,
+        current_close=current_close,
+        current_z_score=current_z_score,
+        target_z=target_z,
+    )
+    if target_exit is not None:
+        return target_exit
+
+    # 3. Time limit
     if bars_held >= max_bars:
         return ExitDecision(
             should_exit=True,

@@ -1,0 +1,57 @@
+======================================================================
+FINAL TEST OF THE H4 FALSE-BREAKOUT MODEL (RULES_v2.md, k=12)
+======================================================================
+
+--- SECTION 6 VALIDATION CHECKS ---
+Check 1 (Last candle < 2025-09-14)          : PASS (Latest candle: 2025-09-12 20:00:00)
+Check 2 (holdout_access.log unchanged)      : PASS (0 -> 0 lines)
+Check 3 (All 6 pairs have trades)           : PASS
+Check 4 (No overlapping trades per pair)    : PASS (Overlaps: 0)
+Check 5 (Every entry_pos == signal_pos + 1) : PASS
+
+ALL SECTION 6 CHECKS PASSED. RUN IS VALID.
+
+======================================================================
+PER-PAIR PERFORMANCE TABLE
+Pair     Trades  Gross (ATR)  Cost_First   Cost_Worst   Net (1.25x)  Win Rate 
+--------------------------------------------------------------------------
+EURUSD   480        +0.0434      0.0442      0.0477     -0.0119     61.7%
+GBPUSD   489        +0.0080      0.0419      0.0495     -0.0443     58.7%
+USDCHF   501        +0.0760      0.0719      0.0866     -0.0139     63.7%
+USDCAD   514        +0.0732      0.0713      0.0785     -0.0159     61.9%
+NZDUSD   476        +0.0600      0.0951      0.1056     -0.0589     63.7%
+EURJPY   526        +0.0484      0.0494      0.0553     -0.0133     62.0%
+--------------------------------------------------------------------------
+ALL 6    2986       +0.0517      0.0622      0.0704     -0.0260     61.9%
+======================================================================
+
+--- EXIT REASONS BREAKDOWN ---
+  gap_exit            :   224 trades ( 7.5%) | Gross: -0.1566 ATR | Net (1.25x): -0.2078 ATR | Win: 34.8%
+  stop_loss           :   637 trades (21.3%) | Gross: -1.5001 ATR | Net (1.25x): -1.5836 ATR | Win:  0.0%
+  target_equilibrium  :  2095 trades (70.2%) | Gross: +0.5585 ATR | Net (1.25x): +0.4795 ATR | Win: 84.5%
+  time_limit          :    30 trades ( 1.0%) | Gross: -0.8338 ATR | Net (1.25x): -0.8946 ATR | Win:  0.0%
+
+Both stop & target triggered on exit candle: 19 trades (0.6%)
+  (Note: In the flawed old order, these would have been wrongly booked as wins; here they are correctly stopped out.)
+
+Cost Comparison: spread_first = 0.0622 ATR vs spread_worst = 0.0704 ATR (+13.2% difference)
+
+======================================================================
+OFFICIAL RULES_v2.md EVALUATION REPORT (k=12)
+======================================================================
+Trades: 2986    ideas tried (k): 12
+Average outcome: +0.0517 ATR    average cost (first): 0.0622 ATR    (worst: 0.0704 ATR)
+
+A  pattern exists   FAIL   99.58% range: -0.0082 to +0.1152 (low end must be above 0)
+B  beats costs      FAIL   outcome minus 1.25x cost: -0.0260 (must be above 0)
+C  beats random     FAIL   beat 98.12% of random runs (need 99.92%)
+D  repeats          PASS   pairs above 0: 6/6 (need 4), quarters above 0: 83% (need 70%)
+E  enough data      PASS   2986 trades (need 300)
+
+VERDICT: NO EDGE FOUND: failed A, B, C
+======================================================================
+
+--- TEST LOG ROW (to paste into RULES_v2.md section 9) ---
+| 2026-11-12 | H4 false-breakout trap (24h fence, rho<0, toll guard, stop-first, spread_first) | 12 | FAIL | FAIL | FAIL | PASS | PASS | - | k=12, 6 pairs H4. Gross +0.0517 ATR, cost_first 0.0622 ATR, margin_net -0.0260 ATR. 19 stop-first corrections. Verdict: NO EDGE FOUND: failed A, B, C |
+----------------------------------------------------------
+

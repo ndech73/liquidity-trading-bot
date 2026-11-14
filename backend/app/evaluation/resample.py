@@ -52,6 +52,7 @@ def resample_m15(candles: pd.DataFrame, target: str) -> tuple[pd.DataFrame, int]
         low=("low", "min"),
         close=("close", "last"),
         volume=("volume", "sum"),
+        spread_first=("spread", "first"),
         spread_worst=("spread", "max"),
         spread_avg=("spread", "mean"),
     ).reset_index()

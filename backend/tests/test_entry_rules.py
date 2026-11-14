@@ -9,7 +9,9 @@ import pandas as pd
 import pytest
 
 from app.entry.entry_rules import (
+    calculate_invalidation_stop,
     calculate_lot_size,
+    check_sufficient_stretch,
     detect_traps,
     generate_trap_signals,
     get_reference_boundaries,
@@ -77,4 +79,36 @@ def test_calculate_lot_size():
 
     # Clamping tests
     min_lot = calculate_lot_size(risk_budget_usd=3.50, stop_distance_points=10000, symbol="EURUSD")
-    assert min_lot == 0.01
+    assert min_lot == 0.0
+
+
+def test_calculate_invalidation_stop():
+    candle = pd.Series({"high": 1.1050, "low": 1.0950, "close": 1.1000})
+    atr_val = 0.0050
+
+    # For Long (+1): stop = low - 0.1 * atr = 1.0950 - 0.0005 = 1.0945
+    long_stop = calculate_invalidation_stop(direction=1, signal_candle=candle, current_atr=atr_val, buffer_atr=0.1)
+    assert pytest.approx(long_stop, abs=1e-6) == 1.0945
+
+    # For Short (-1): stop = high + 0.1 * atr = 1.1050 + 0.0005 = 1.1055
+    short_stop = calculate_invalidation_stop(direction=-1, signal_candle=candle, current_atr=atr_val, buffer_atr=0.1)
+    assert pytest.approx(short_stop, abs=1e-6) == 1.1055
+
+
+def test_check_sufficient_stretch():
+    candles = make_test_candles(30)
+    # Give candles an ATR around 0.0010
+    prior_high = pd.Series(1.1050, index=candles.index)  # wide ceiling
+    prior_low = pd.Series(1.0950, index=candles.index)   # wide floor
+
+    # Candle 15 close is 1.1000:
+    # Distance to ceiling = 1.1050 - 1.1000 = 0.0050 (~8x ATR) -> True
+    # Distance to floor = 1.1000 - 1.0950 = 0.0050 (~8x ATR) -> True
+    long_ok, short_ok = check_sufficient_stretch(candles, prior_high, prior_low, min_span_atr=1.0)
+    assert bool(long_ok.iloc[15]) is True
+    assert bool(short_ok.iloc[15]) is True
+
+    # If ceiling is extremely tight (1.1001 vs close 1.1000):
+    tight_high = pd.Series(1.1001, index=candles.index)
+    long_ok_tight, _ = check_sufficient_stretch(candles, tight_high, prior_low, min_span_atr=1.0)
+    assert bool(long_ok_tight.iloc[15]) is False
