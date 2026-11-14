@@ -200,3 +200,4 @@ result.
 ## 12. Changelog
 
 - 2026-11-14: File created before any data download and before any code.
+- 2026-11-14: Weekend candles were found by the data check, before any outcome was seen: Sundays 2016-05-22, 2016-05-29, 2016-06-05, 2016-06-12, 2016-06-19 and 2024-10-27 on all six pairs, and Saturday 2009-10-31 on USDCAD and EURJPY. Decision: a Sunday candle is merged into the following Monday candle (open from the Sunday, highest high and lowest low of both, close from the Monday). A Saturday candle is merged into the preceding Friday candle (open from the Friday, highest high and lowest low of both, close from the Saturday). Cleaned files are saved as SYMBOL_D1CLEAN.csv and used for all tests. The same merge rule is applied to the hold-out period, where only counts, never dates or prices, are looked at.
