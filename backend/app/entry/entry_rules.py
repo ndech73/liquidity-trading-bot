@@ -101,7 +101,7 @@ def is_fee_cheap(
     candles: pd.DataFrame,
     symbol: str,
     max_cost_ratio: float = 0.15,
-    blackout_hours: tuple = (21, 22, 23),
+    blackout_hours: tuple = (0, 1),
 ) -> pd.Series:
     """
     Two checks, both must pass:
@@ -165,7 +165,7 @@ def generate_trap_signals(
     lookback: int = 24,
     max_cost_ratio: float = 0.15,
     min_span_atr: float = 0.0,
-    blackout_hours: tuple = (21, 22, 23),
+    blackout_hours: tuple = (0, 1),
 ) -> pd.Series:
     """
     Unified Entry Engine for H1 and H4:

@@ -35,3 +35,6 @@ mt5linux = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 pythonpath = ["."]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
