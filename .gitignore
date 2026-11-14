@@ -21,3 +21,4 @@ data/backtests/*
 .idea/
 backend/app/scratch/
 *.tsbuildinfo
+*.egg-info/
