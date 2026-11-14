@@ -1,0 +1,60 @@
+{
+  "rule": "today's demo swap values, in points per lot per night, used for all years",
+  "reading_time": "2026-11-14T12:04:50.700122+00:00",
+  "pairs": {
+    "EURUSD": {
+      "swap_mode": "points",
+      "swap_mode_raw": 1,
+      "swap_long": -7.7,
+      "swap_short": 2.0,
+      "swap_rollover3days_raw": 3,
+      "swap_rollover3days_name": "Wednesday",
+      "point": 1e-05
+    },
+    "GBPUSD": {
+      "swap_mode": "points",
+      "swap_mode_raw": 1,
+      "swap_long": -2.91,
+      "swap_short": -1.15,
+      "swap_rollover3days_raw": 3,
+      "swap_rollover3days_name": "Wednesday",
+      "point": 1e-05
+    },
+    "USDCHF": {
+      "swap_mode": "points",
+      "swap_mode_raw": 1,
+      "swap_long": 5.01,
+      "swap_short": -11.97,
+      "swap_rollover3days_raw": 3,
+      "swap_rollover3days_name": "Wednesday",
+      "point": 1e-05
+    },
+    "USDCAD": {
+      "swap_mode": "points",
+      "swap_mode_raw": 1,
+      "swap_long": -1.17,
+      "swap_short": -2.98,
+      "swap_rollover3days_raw": 3,
+      "swap_rollover3days_name": "Wednesday",
+      "point": 1e-05
+    },
+    "NZDUSD": {
+      "swap_mode": "points",
+      "swap_mode_raw": 1,
+      "swap_long": -0.55,
+      "swap_short": -1.4,
+      "swap_rollover3days_raw": 3,
+      "swap_rollover3days_name": "Wednesday",
+      "point": 1e-05
+    },
+    "EURJPY": {
+      "swap_mode": "points",
+      "swap_mode_raw": 1,
+      "swap_long": 4.57,
+      "swap_short": -15.71,
+      "swap_rollover3days_raw": 3,
+      "swap_rollover3days_name": "Wednesday",
+      "point": 0.001
+    }
+  }
+}

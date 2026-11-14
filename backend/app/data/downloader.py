@@ -93,6 +93,7 @@ def download_candles(
     timeframe: str,
     start: datetime,
     end: datetime,
+    chunk_days: int = CHUNK_DAYS,
     host: str = "127.0.0.1",
     port: int = 18812,
 ) -> pd.DataFrame:
@@ -127,7 +128,7 @@ def download_candles(
         pieces = []
         chunk_start = start
         while chunk_start < end:
-            chunk_end = min(chunk_start + timedelta(days=CHUNK_DAYS), end)
+            chunk_end = min(chunk_start + timedelta(days=chunk_days), end)
 
             # MT5 wants real dates on ITS side, so we copy ours across.
             remote_start = rpyc.classic.deliver(conn, chunk_start)
@@ -165,13 +166,14 @@ def main():
     parser.add_argument("--timeframe", default="M15")
     parser.add_argument("--start", required=True, help="YYYY-MM-DD")
     parser.add_argument("--end", required=True, help="YYYY-MM-DD")
+    parser.add_argument("--chunk-days", type=int, default=CHUNK_DAYS, help=f"Days per request chunk (default: {CHUNK_DAYS})")
     args = parser.parse_args()
 
     start = datetime.strptime(args.start, "%Y-%m-%d")
     end = datetime.strptime(args.end, "%Y-%m-%d")
 
     for symbol in args.symbols:
-        candles = download_candles(symbol, args.timeframe, start, end)
+        candles = download_candles(symbol, args.timeframe, start, end, chunk_days=args.chunk_days)
         path = save_candles(candles, symbol, args.timeframe)
         print(f"{symbol}: {len(candles)} candles saved to {path}")
 

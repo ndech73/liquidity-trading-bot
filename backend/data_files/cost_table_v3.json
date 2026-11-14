@@ -1,0 +1,42 @@
+{
+  "rule": "median M15 spread in points, server hours 02-23, development data only",
+  "created_at": "2026-11-14T12:04:49.947613+00:00",
+  "pairs": {
+    "EURUSD": {
+      "median_spread_points": 8.0,
+      "candles_used": 66148,
+      "first_date": "2022-10-19 02:00",
+      "last_date": "2025-09-12 23:45"
+    },
+    "GBPUSD": {
+      "median_spread_points": 9.0,
+      "candles_used": 66413,
+      "first_date": "2022-10-14 02:00",
+      "last_date": "2025-09-12 23:45"
+    },
+    "USDCHF": {
+      "median_spread_points": 9.0,
+      "candles_used": 66412,
+      "first_date": "2022-10-14 02:00",
+      "last_date": "2025-09-12 23:45"
+    },
+    "USDCAD": {
+      "median_spread_points": 12.0,
+      "candles_used": 66060,
+      "first_date": "2022-10-20 02:00",
+      "last_date": "2025-09-12 23:45"
+    },
+    "NZDUSD": {
+      "median_spread_points": 14.0,
+      "candles_used": 63507,
+      "first_date": "2022-11-30 02:00",
+      "last_date": "2025-09-12 23:45"
+    },
+    "EURJPY": {
+      "median_spread_points": 12.0,
+      "candles_used": 65973,
+      "first_date": "2022-10-21 02:00",
+      "last_date": "2025-09-12 23:45"
+    }
+  }
+}
